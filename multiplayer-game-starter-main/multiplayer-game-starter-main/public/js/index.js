@@ -54,26 +54,76 @@ function animate() {
 
 animate()
 
+const keys={
+  w:{
+    pressed:false
+  },
+  a:{
+    pressed:false
+  },
+  s:{
+    pressed:false
+  },
+  d:{
+    pressed:false
+  }
+}
+
+setInterval(() => { 
+  if(keys.w.pressed){
+    players[socket.id].y -= 10
+    socket.emit('keydown','KeyW')
+  }
+  if(keys.a.pressed){
+    players[socket.id].x -= 10
+    socket.emit('keydown','KeyA')
+  }
+  if(keys.s.pressed){
+    players[socket.id].y += 10
+    socket.emit('keydown','KeyS')
+  }
+  if(keys.d.pressed){
+    players[socket.id].x += 10
+    socket.emit('keydown','KeyD')
+  }
+  
+  
+
+},15)
+
 window.addEventListener('keydown',(event)=>{
   if(!players[socket.id]) return
   
   switch(event.code){
     case 'KeyW':
-      players[socket.id].y -= 10
-      socket.emit('keydown','KeyW')
+      keys.w.pressed = true
       break
     case 'KeyA':
-      players[socket.id].x -= 10
-      socket.emit('keydown','KeyA')
+      keys.a.pressed = true
       break
     case 'KeyS':
-      players[socket.id].y += 10
-      socket.emit('keydown','KeyS')
+      keys.s.pressed = true
       break
     case 'KeyD':
-      players[socket.id].x += 10
-      socket.emit('keydown','KeyD')
+      keys.d.pressed = true
       break
   }
 })
 
+window.addEventListener('keyup',(event)=>{
+  if(!players[socket.id]) return
+  
+  switch(event.code){
+    case 'KeyW':
+      keys.w.pressed = false
+      break
+    case 'KeyA':
+      keys.a.pressed = false
+      break
+    case 'KeyS':
+      keys.s.pressed = false
+      break
+    case 'KeyD':
+      keys.d.pressed = false
+  }
+})
