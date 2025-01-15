@@ -1,15 +1,14 @@
 class Player {
-  constructor(x, y, radius, color) {
+  constructor(x, y, width, height, imageSrc) {
     this.x = x
     this.y = y
-    this.radius = radius
-    this.color = color
+    this.width = width
+    this.height = height
+    this.image = new Image()
+    this.image.src = imageSrc  // Set the image source
   }
 
   draw() {
-    c.beginPath()
-    c.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false)
-    c.fillStyle = this.color
-    c.fill()
+    c.drawImage(this.image, this.x - this.width / 2, this.y - this.height / 2, this.width, this.height)
   }
 }

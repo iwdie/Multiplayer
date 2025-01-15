@@ -9,17 +9,95 @@ canvas.height = innerHeight
 
 const x = canvas.width / 2
 const y = canvas.height / 2
+const player = new Player(x, y, 50, 50,'./images/image (2).png')
+const horse = new horses(x, y, 150, 150, './images/horseswithbg-removebg-preview.png', 'rgba(248, 231, 84, 0.53)')
 
-const player = new Player(x, y, 10, 'white')
+const backgroundMusic = new Audio('./sounds/mingle_sound.mp3'); // Path to your music file
+backgroundMusic.loop = true; // Enable looping
+backgroundMusic.volume = 0.5; // Adjust volume (range: 0.0 to 1.0)
+
+// Add a button for the user to start the music
+const startMusicButton = document.createElement('button');
+startMusicButton.textContent = 'Play Background Music';
+startMusicButton.style.position = 'absolute';
+startMusicButton.style.top = '10px';
+startMusicButton.style.left = '10px';
+startMusicButton.style.padding = '10px';
+startMusicButton.style.fontSize = '16px';
+startMusicButton.style.cursor = 'pointer';
+document.body.appendChild(startMusicButton);
+
+let totalTime = 10 * 60; // Total time in seconds (e.g., 10 minutes)
+
+function drawTimer() {
+  const minutes = Math.floor(totalTime / 60);
+  const seconds = totalTime % 60;
+
+  const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds
+    .toString()
+    .padStart(2, '0')}`;
+
+  // Set the box style (glowing effect)
+  const boxWidth = 200;
+  const boxHeight = 60;
+  const boxX = canvas.width / 2 - boxWidth / 2;
+  const boxY = 10;
+
+  // Draw the glowing box background
+  c.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  c.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+  // Add glowing effect to the box
+  c.shadowColor = 'red';
+  c.shadowBlur = 15;
+  c.lineWidth = 5;
+  c.strokeStyle = 'red';
+  c.strokeRect(boxX, boxY, boxWidth, boxHeight);
+  c.shadowColor = 'transparent'; // Reset shadow for text
+
+  // Draw the timer text inside the box
+  c.font = '40px Arial'; // Font size and family
+  c.textAlign = 'center'; // Center align the text
+  c.fillStyle = 'red'; // Text color
+  c.fillText(formattedTime, canvas.width / 2, boxY + boxHeight / 2 + 10); // Position the text
+
+  // Reset the shadow effect to avoid applying it elsewhere
+  c.shadowBlur = 0;
+}
+
+
+
+
+setInterval(() => {
+  if (totalTime > 0) {
+    totalTime--; // Decrease total time
+  } else {
+    console.log('Time is up!');
+    clearInterval(); // Optional: Stop timer logic
+  }
+}, 1000);
+
+// Play the music when the button is clicked
+startMusicButton.addEventListener('click', () => {
+  backgroundMusic.play()
+    .then(() => {
+      console.log('Background music started');
+      startMusicButton.style.display = 'none'; // Hide the button after music starts
+    })
+    .catch((error) => {
+      console.error('Error playing background music:', error);
+    });
+});
+
 const players = {}
 
 socket.on('updatePlayers', (BackendPlayers) => {
  for (const id in BackendPlayers) {
     const player = BackendPlayers[id]
-    players[id] = new Player(player.x, player.y, 10, 'white')
+    players[id] = new Player(player.x, player.y, 50,50, './images/image (2).png')
   
   if(!players[id]){
-    players[id] = new Player(x, y, 10, 'white')
+    players[id] = new Player(x, y, 50, 50, './images/image (2).png')
   }
   else{
     players[id].x = player.x
@@ -40,14 +118,17 @@ let animationId
  
 function animate() {
   animationId = requestAnimationFrame(animate)
-  c.fillStyle = 'rgba(193, 10, 110, 0.1)'
+  c.fillStyle = 'rgba(234, 88, 31, 0.1)'
   c.fillRect(0, 0, canvas.width, canvas.height)
+  horse.update()
+  horse.draw()
+
   for (const id in players) {
       const player = players[id]
       player.draw()
   }
 
- 
+  drawTimer(); // Draw the timer on the canvas
 
    
 }
