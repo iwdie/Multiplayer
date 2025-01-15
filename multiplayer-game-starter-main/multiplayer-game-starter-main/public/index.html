@@ -17,10 +17,73 @@
         user-select: none;
       "
     >
-      <span>Score: <span id="scoreEl">0</span></span>
+      
     </div>
     <canvas></canvas>
 
+    
+  
+  
+       
+
+      <!-- username input -->
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
+        "
+      >
+        <form id="usernameForm">
+          <div>
+            <input
+              id="usernameInput"
+              type="text"
+              placeholder="Username"
+              style="
+                padding: 12px;
+                border-radius: 20px;
+                border: none;
+                background: #475569;
+                color: #cbd5e1;
+              "
+            />
+          </div>
+          <div style="text-align: center; margin-top: 8px">
+            <button
+              style="
+                padding: 8px 20px;
+                border-radius: 100px;
+                border: none;
+                background-image: linear-gradient(
+                  to right,
+                  rgb(212, 6, 95),
+                  rgb(246, 59, 174)
+                );
+                color: white;
+                cursor: pointer;
+              "
+            >
+            ○ △ □
+            </button>
+          </div>
+        </form>
+      </div>
+      <!-- username input end -->
+    </div>
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.2/gsap.min.js"
+      integrity="sha512-kVlGhj2qFy+KBCFuvjBJTGUMxbdqJKs4yK2jh0e0VPhWUPiPC87bzm4THmaaIee3Oj7j6sDpTTgm2EPPiESqBg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.2/gsap.min.js"
       integrity="sha512-kVlGhj2qFy+KBCFuvjBJTGUMxbdqJKs4yK2jh0e0VPhWUPiPC87bzm4THmaaIee3Oj7j6sDpTTgm2EPPiESqBg=="
@@ -37,3 +100,4 @@
     <script src="./js/index.js"></script>
   </body>
 </html>
+

@@ -18,7 +18,7 @@ backgroundMusic.volume = 0.5; // Adjust volume (range: 0.0 to 1.0)
 
 // Add a button for the user to start the music
 const startMusicButton = document.createElement('button');
-startMusicButton.textContent = 'Play Background Music';
+startMusicButton.textContent = '🎶';
 startMusicButton.style.position = 'absolute';
 startMusicButton.style.top = '10px';
 startMusicButton.style.left = '10px';
@@ -208,3 +208,11 @@ window.addEventListener('keyup',(event)=>{
       keys.d.pressed = false
   }
 })
+
+document.querySelector('#usernameForm').addEventListener('submit',(event)=>{
+  event.preventDefault()
+  
+  socket.emit('initGame',document.querySelector('#usernameInput').value)
+  document.querySelector('#usernameForm').style.display = 'none'
+})
+

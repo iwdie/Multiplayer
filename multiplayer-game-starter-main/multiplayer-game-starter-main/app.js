@@ -19,9 +19,13 @@ const players = {};
 
 io.on('connection', (socket) => {
   console.log('a user connected'); 
-  players[socket.id] = { x: 500*Math.random(), y: 500*Math.random() };
+ 
 
   io.emit('updatePlayers', players);
+  
+  socket.on('initGame', (username) => {
+    players[socket.id] = { x: 500*Math.random(), y: 500*Math.random(),username}
+  });
 
   socket.on('disconnect', (reason) => {
     delete players[socket.id];
