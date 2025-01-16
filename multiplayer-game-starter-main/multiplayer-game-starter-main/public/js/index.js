@@ -10,7 +10,7 @@ canvas.height = innerHeight
 const x = canvas.width / 2
 const y = canvas.height / 2
 const player = new Player(x, y, 50, 50,'./images/image (2).png')
-const horse = new horses(x, y, 150, 150, './images/horseswithbg-removebg-preview.png', 'rgba(248, 231, 84, 0.53)')
+const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 231, 84, 0.53)')
 
 const backgroundMusic = new Audio('./sounds/mingle_sound.mp3'); // Path to your music file
 backgroundMusic.loop = true; // Enable looping
@@ -113,6 +113,82 @@ socket.on('updatePlayers', (BackendPlayers) => {
 
 });
 
+let isDialogOpen = false; // Track dialog status
+
+function checkMingle() {
+  for (const id1 in players) {
+    for (const id2 in players) {
+      if (id1 !== id2) {
+        const player1 = players[id1];
+        const player2 = players[id2];
+
+        if (player1.isMinglingWith(player2) && !isDialogOpen) {
+          openMingleDialog(player1, player2);
+          console.log('hello')
+          return; // Exit once a dialog is opened
+        }
+      }
+    }
+  }
+}
+
+// Function to open the dialog
+function openMingleDialog(player1, player2) {
+  isDialogOpen = true;
+
+  // Display a custom dialog box
+  const dialog = document.createElement('div');
+  dialog.style.position = 'absolute';
+  dialog.style.top = '50%';
+  dialog.style.left = '50%';
+  dialog.style.transform = 'translate(-50%, -50%)';
+  dialog.style.padding = '20px';
+  dialog.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+  dialog.style.color = 'white';
+  dialog.style.borderRadius = '4px';
+  dialog.style.textAlign = 'center';
+  dialog.style.boxShadow = '0 0 15px pink';
+
+  // Dialog content
+  dialog.innerHTML = `
+    <p font-family: Verdana, Geneva, sans-serif;>Player wants to mingle! Do you accept?</p>
+    <button id="mingleYes" style="margin: 10px; padding: 10px;padding-right:20px;padding-left:20px;background-color: blue;color:white; font-weight: bold;">O</button>
+    <button id="mingleNo" style="margin: 10px; padding: 10px; padding-right:20px;padding-left:20px;background-color:red;color:white; font-weight: bold;">X</button>
+  `;
+  document.body.appendChild(dialog);
+
+  // Handle button clicks
+  document.getElementById('mingleYes').onclick = () => {
+    handleMingleResponse(player1, player2, true);
+    document.body.removeChild(dialog);
+    isDialogOpen = false;
+  };
+
+  document.getElementById('mingleNo').onclick = () => {
+    handleMingleResponse(player1, player2, false);
+    document.body.removeChild(dialog);
+    isDialogOpen = false;
+  };
+}
+
+// Function to handle mingle response
+function handleMingleResponse(player1, player2, accepted) {
+  if (accepted) {
+    console.log(`${player1} and ${player2} have mingled!`);
+
+    
+
+    // Emit mingle success to server
+    socket.emit('mingleSuccess', { player1Id: player1.id, player2Id: player2.id });
+
+    // Reset image after 3 seconds
+  
+  } else {
+    console.log(`${player1} declined to mingle with ${player2}.`);
+  }
+}
+
+
 
 let animationId
  
@@ -122,6 +198,8 @@ function animate() {
   c.fillRect(0, 0, canvas.width, canvas.height)
   horse.update()
   horse.draw()
+
+  checkMingle();
 
   for (const id in players) {
       const player = players[id]

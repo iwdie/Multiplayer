@@ -22,7 +22,7 @@ class horses {
         c.rotate(this.angle); // Rotate the canvas
   
         // Set glow effect
-        c.shadowBlur = 20; // Intensity of the glow
+        c.shadowBlur = 11; // Intensity of the glow
         c.shadowColor = this.glowColor; // Color of the glow
         c.shadowOffsetX = 0; // No horizontal shadow offset
         c.shadowOffsetY = 0; // No vertical shadow offset
