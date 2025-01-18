@@ -16,7 +16,10 @@ app.get('/', (req, res) => {
 })
 
 const players = {};
-const minglingPairs = {};
+const groups = {};
+const groupRequests = {}; // Tracks ongoing mingle requests { requestId: { groupId, targetId, timeout } }
+
+let groupIdCounter = 1; // To generate unique group IDs
 
 io.on('connection', (socket) => {
   console.log('a user connected'); 
@@ -25,13 +28,30 @@ io.on('connection', (socket) => {
   io.emit('updatePlayers', players);
   
   socket.on('initGame', (username) => {
-    players[socket.id] = { x: 500*Math.random(), y: 500*Math.random(),username}
+    players[socket.id] = { x: 500*Math.random(), y: 500*Math.random(),username,busy: false }
   });
 
-  socket.on('disconnect', (reason) => {
-    delete players[socket.id];
+  socket.on('disconnect', () => {
+    const player = players[socket.id];
+
+    if (player) {
+      if (player.groupId && groups[player.groupId]) {
+        // Remove player from their group
+        groups[player.groupId] = groups[player.groupId].filter((id) => id !== socket.id);
+
+        // Delete the group if it's empty
+        if (groups[player.groupId].length === 0) {
+          delete groups[player.groupId];
+        } else {
+          io.emit('groupUpdate', groups); // Notify others about the group update
+        }
+      }
+      delete players[socket.id];
+    }
+    console.log('A user disconnected');
   });
 
+  
   socket.on('keydown', (keycode) => {
     switch(keycode){
       case 'KeyW':
@@ -47,36 +67,76 @@ io.on('connection', (socket) => {
         players[socket.id].x += 10;
     }
   });
-   // Handle mingle request
-   socket.on('requestMingle', (targetId) => {
-    if (players[targetId] && players[socket.id]) {
-      minglingPairs[socket.id] = targetId;
-      minglingPairs[targetId] = socket.id;
+  socket.on('requestMingle', (targetId) => {
+    const requester = players[socket.id];
+    const target = players[targetId];
 
-      // Notify both players about the mingle request
-      io.to(socket.id).emit('mingleRequested', players[targetId]);
-      io.to(targetId).emit('mingleRequested', players[socket.id]);
+    if (!requester || !target || requester.busy || target.busy) {
+      io.to(socket.id).emit('error', 'Player is busy or invalid.');
+      return;
     }
+
+    const requestId = `${socket.id}-${targetId}`;
+    requester.busy = true;
+    target.busy = true;
+
+    // Store the request with a timeout
+    groupRequests[requestId] = {
+      groupId: null,
+      targetId,
+      timeout: setTimeout(() => {
+        // Timeout logic
+        delete groupRequests[requestId];
+        requester.busy = false;
+        target.busy = false;
+        io.to(socket.id).emit('mingleTimeout');
+        io.to(targetId).emit('mingleTimeout');
+      }, 10000), // 10 seconds timeout
+    };
+
+    io.to(targetId).emit('mingleRequested', { from: socket.id, username: requester.username });
   });
 
-  // Handle mingle response
+  // Response to mingle request
   socket.on('respondMingle', (data) => {
-    const { targetId, accepted } = data;
+    const { requestId, accepted } = data;
+    const request = groupRequests[requestId];
 
-    if (minglingPairs[socket.id] === targetId) {
-      if (accepted) {
-        // Both players agreed to mingle
-        io.to(socket.id).emit('mingleSuccess', players[targetId]);
-        io.to(targetId).emit('mingleSuccess', players[socket.id]);
+    if (!request) return;
+
+    const { targetId } = request;
+    const requester = players[socket.id];
+    const target = players[targetId];
+
+    clearTimeout(request.timeout); // Clear timeout for the request
+    delete groupRequests[requestId];
+
+    if (accepted && requester && target) {
+      // Create or join a group
+      if (requester.groupId || target.groupId) {
+        const groupId = requester.groupId || target.groupId;
+        groups[groupId] = [...new Set([...(groups[groupId] || []), socket.id, targetId])];
+        requester.groupId = groupId;
+        target.groupId = groupId;
       } else {
-        // Mingle request declined
-        io.to(socket.id).emit('mingleDeclined', players[targetId]);
-        io.to(targetId).emit('mingleDeclined', players[socket.id]);
+        const newGroupId = `group-${groupIdCounter++}`;
+        groups[newGroupId] = [socket.id, targetId];
+        requester.groupId = newGroupId;
+        target.groupId = newGroupId;
       }
 
-      // Clear mingle pair
-      delete minglingPairs[socket.id];
-      delete minglingPairs[targetId];
+      // Notify players about the successful mingle
+      io.to(socket.id).emit('mingleSuccess', groups[requester.groupId]);
+      io.to(targetId).emit('mingleSuccess', groups[requester.groupId]);
+
+      io.emit('groupUpdate', groups); // Update all players about group changes
+    } else {
+      // Notify about decline
+      if (requester) requester.busy = false;
+      if (target) target.busy = false;
+
+      io.to(socket.id).emit('mingleDeclined', target ? target.username : null);
+      io.to(targetId).emit('mingleDeclined', requester ? requester.username : null);
     }
   });
 

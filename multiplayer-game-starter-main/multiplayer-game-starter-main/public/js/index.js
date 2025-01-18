@@ -114,7 +114,66 @@ socket.on('updatePlayers', (BackendPlayers) => {
 });
 
 let isDialogOpen = false; // Track dialog status
+// Handle group updates
+socket.on('groupUpdate', (groups) => {
+  console.log('Group updates received:', groups);
 
+  // Optional: Visualize groups (e.g., display in a sidebar)
+});
+
+// Handle mingle requests
+socket.on('mingleRequested', (data) => {
+  const { from, username } = data;
+  openMingleDialog({ id: from, username });
+});
+
+// Handle responses from the server
+socket.on('mingleSuccess', (group) => {
+  console.log('Mingle success:', group);
+
+  // Optional: Highlight group members visually
+});
+
+socket.on('mingleDeclined', (username) => {
+  console.log(`${username} declined the mingle request.`);
+});
+
+socket.on('mingleTimeout', () => {
+  console.log('Mingle request timed out.');
+});
+
+socket.on('groupUpdate', (groups) => {
+  const groupList = document.querySelector('#groupList');
+  groupList.innerHTML = ''; // Clear previous group data
+
+  if (Object.keys(groups).length === 0) {
+    groupList.innerHTML = '<p style="text-align: center;">No groups yet.</p>';
+    return;
+  }
+
+  for (const groupId in groups) {
+    const group = groups[groupId];
+    const groupDiv = document.createElement('div');
+    groupDiv.style.marginBottom = '15px';
+    groupDiv.style.padding = '10px';
+    groupDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+    groupDiv.style.borderRadius = '5px';
+    groupDiv.style.boxShadow = '0 0 5px rgba(255, 255, 255, 0.2)';
+
+    groupDiv.innerHTML = `
+      <strong style="color:  rgb(255, 0, 149);">Group ID:</strong> ${groupId}<br>
+      <strong style="color:  rgb(255, 0, 149);">Members:</strong>
+      <ul style="margin: 5px 0; padding-left: 20px; list-style: disc;">
+        ${group
+          .map((member) => `<li>${member.username} (Player ${member.id})</li>`)
+          .join('')}
+      </ul>
+    `;
+    groupList.appendChild(groupDiv);
+  }
+});
+
+// Emit mingle request
 function checkMingle() {
   for (const id1 in players) {
     for (const id2 in players) {
@@ -123,20 +182,18 @@ function checkMingle() {
         const player2 = players[id2];
 
         if (player1.isMinglingWith(player2) && !isDialogOpen) {
-          openMingleDialog(player1, player2);
-          console.log('hello')
-          return; // Exit once a dialog is opened
+          socket.emit('requestMingle', id2);
+          return; // Exit once a request is emitted
         }
       }
     }
   }
 }
 
-// Function to open the dialog
-function openMingleDialog(player1, player2) {
+// Adjust mingle dialog
+function openMingleDialog(request) {
   isDialogOpen = true;
 
-  // Display a custom dialog box
   const dialog = document.createElement('div');
   dialog.style.position = 'absolute';
   dialog.style.top = '50%';
@@ -149,45 +206,25 @@ function openMingleDialog(player1, player2) {
   dialog.style.textAlign = 'center';
   dialog.style.boxShadow = '0 0 15px pink';
 
-  // Dialog content
   dialog.innerHTML = `
-    <p font-family: Verdana, Geneva, sans-serif;>Player wants to mingle! Do you accept?</p>
-    <button id="mingleYes" style="margin: 10px; padding: 10px;padding-right:20px;padding-left:20px;background-color: blue;color:white; font-weight: bold;">O</button>
-    <button id="mingleNo" style="margin: 10px; padding: 10px; padding-right:20px;padding-left:20px;background-color:red;color:white; font-weight: bold;">X</button>
+    <p>${request.username} wants to mingle! Do you accept?</p>
+    <button id="mingleYes" style="margin: 10px; padding: 10px; background-color: blue; color: white;">Yes</button>
+    <button id="mingleNo" style="margin: 10px; padding: 10px; background-color: red; color: white;">No</button>
   `;
   document.body.appendChild(dialog);
 
-  // Handle button clicks
   document.getElementById('mingleYes').onclick = () => {
-    handleMingleResponse(player1, player2, true);
+    socket.emit('respondMingle', { requestId: `${request.id}-${socket.id}`, accepted: true });
     document.body.removeChild(dialog);
     isDialogOpen = false;
   };
 
   document.getElementById('mingleNo').onclick = () => {
-    handleMingleResponse(player1, player2, false);
+    socket.emit('respondMingle', { requestId: `${request.id}-${socket.id}`, accepted: false });
     document.body.removeChild(dialog);
     isDialogOpen = false;
   };
 }
-
-// Function to handle mingle response
-function handleMingleResponse(player1, player2, accepted) {
-  if (accepted) {
-    console.log(`${player1} and ${player2} have mingled!`);
-
-    
-
-    // Emit mingle success to server
-    socket.emit('mingleSuccess', { player1Id: player1.id, player2Id: player2.id });
-
-    // Reset image after 3 seconds
-  
-  } else {
-    console.log(`${player1} declined to mingle with ${player2}.`);
-  }
-}
-
 
 
 let animationId
