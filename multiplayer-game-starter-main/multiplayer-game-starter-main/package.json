@@ -2,7 +2,7 @@
   "name": "multiplayer-game",
   "version": "1.0.0",
   "description": "A multiplayer game using Socket.IO",
-  "main": "server.js",
+  "main": "app.js",
   "dependencies": {
     "express": "^4.21.2",
     "socket.io": "4.6.1"
