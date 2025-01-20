@@ -232,7 +232,7 @@ let animationId
 function animate() {
   animationId = requestAnimationFrame(animate)
   c.fillStyle = 'rgba(234, 88, 31, 0.1)'
-  c.fillRect(0, 0, canvas.width, canvas.height)
+  c.clearRect(0, 0, canvas.width, canvas.height);
   horse.update()
   horse.draw()
 
