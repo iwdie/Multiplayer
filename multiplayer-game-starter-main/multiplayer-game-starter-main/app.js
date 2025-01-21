@@ -16,19 +16,33 @@ app.get('/', (req, res) => {
 })
 
 const players = {};
+let playerCount = 0;
 const groups = {};
 const groupRequests = {}; // Tracks ongoing mingle requests { requestId: { groupId, targetId, timeout } }
 
 let groupIdCounter = 1; // To generate unique group IDs
 
+
 io.on('connection', (socket) => {
   console.log('a user connected'); 
- 
+
+  
+  socket.on('emitTimer', () => {
+    endTimer();
+  });
+  
+
 
   io.emit('updatePlayers', players);
   
   socket.on('initGame', (username) => {
     players[socket.id] = { x: 500*Math.random(), y: 500*Math.random(),username,busy: false }
+    playerCount++;
+    if (playerCount == 5) {
+       
+        io.emit('startTimer'); // Notify all clients to start the timer
+      
+      }
   });
 
   socket.on('disconnect', () => {
@@ -55,16 +69,16 @@ io.on('connection', (socket) => {
   socket.on('keydown', (keycode) => {
     switch(keycode){
       case 'KeyW':
-        players[socket.id].y -= 10;
+        players[socket.id].y -= 5;
         break;
       case 'KeyA':
-        players[socket.id].x -= 10;
+        players[socket.id].x -= 5;
         break;
       case 'KeyS':
-        players[socket.id].y += 10;
+        players[socket.id].y += 5;
         break;
       case 'KeyD':
-        players[socket.id].x += 10;
+        players[socket.id].x += 5;
     }
   });
   socket.on('requestMingle', (targetId) => {
@@ -97,10 +111,26 @@ io.on('connection', (socket) => {
     io.to(targetId).emit('mingleRequested', { from: socket.id, username: requester.username });
   });
 
+  function endTimer() {
+    console.log('Timer ended!');
+  
+    const unmingledPlayers = Object.keys(players).filter(
+      (playerId) => !players[playerId].mingled
+    );
+  
+    // Emit 'gameOver' event to all unmingled players
+    unmingledPlayers.forEach((playerId) => {
+      io.to(playerId).emit('gameOver', { message: 'Game Over! You did not mingle in time.' });
+    });
+  
+    console.log(`Game Over sent to: ${unmingledPlayers.join(', ')}`);
+  }
   // Response to mingle request
   socket.on('respondMingle', (data) => {
     const { requestId, accepted } = data;
     const request = groupRequests[requestId];
+    players[requestId].mingled = true;
+    players[targetId].mingled = true;
 
     if (!request) return;
 
@@ -137,6 +167,11 @@ io.on('connection', (socket) => {
 
       io.to(socket.id).emit('mingleDeclined', target ? target.username : null);
       io.to(targetId).emit('mingleDeclined', requester ? requester.username : null);
+    }
+  });
+  socket.on('playerMingled', (playerId) => {
+    if (players[playerId]) {
+      players[playerId].mingled = true; // Mark the player as mingled
     }
   });
 

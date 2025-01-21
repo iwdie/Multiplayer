@@ -10,15 +10,18 @@ canvas.height = innerHeight
 const x = canvas.width / 2
 const y = canvas.height / 2
 const player = new Player(x, y, 50, 50,'./images/image (2).png')
-const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 231, 84, 0.53)')
+const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)')
 
 const backgroundMusic = new Audio('./sounds/mingle_sound.mp3'); // Path to your music file
 backgroundMusic.loop = true; // Enable looping
 backgroundMusic.volume = 0.5; // Adjust volume (range: 0.0 to 1.0)
 
 // Add a button for the user to start the music
+
 const startMusicButton = document.createElement('button');
+startMusicButton.style.backgroundColor= 'black';
 startMusicButton.textContent = '🎶';
+startMusicButton.color = 'color:  rgb(241, 23, 150)';
 startMusicButton.style.position = 'absolute';
 startMusicButton.style.top = '10px';
 startMusicButton.style.left = '10px';
@@ -27,7 +30,66 @@ startMusicButton.style.fontSize = '16px';
 startMusicButton.style.cursor = 'pointer';
 document.body.appendChild(startMusicButton);
 
+socket.on('gameOver', (data) => {
+  console.log(data.message); // Log the message from the server
+
+  // Display Game Over message
+  const gameOverScreen = document.createElement('div');
+  gameOverScreen.style.position = 'absolute';
+  gameOverScreen.style.top = '50%';
+  gameOverScreen.style.left = '50%';
+  gameOverScreen.style.transform = 'translate(-50%, -50%)';
+  gameOverScreen.style.padding = '20px';
+  gameOverScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+  gameOverScreen.style.color = 'white';
+  gameOverScreen.style.fontSize = '30px';
+  gameOverScreen.style.borderRadius = '10px';
+  gameOverScreen.style.textAlign = 'center';
+  gameOverScreen.style.boxShadow = '0 0 15px red';
+
+  gameOverScreen.innerHTML = `<p>${data.message}</p>`;
+  document.body.appendChild(gameOverScreen);
+
+  // Stop further interactions (optional)
+  cancelAnimationFrame(animationId); // Stop the animation
+});
+
+
 let totalTime = 10 * 60; // Total time in seconds (e.g., 10 minutes)
+let timerInterval = null; // Store the timer interval
+
+function startTimer() {
+  if (timerInterval) return; // Prevent multiple timers
+
+  timerInterval = setInterval(() => {
+    if (totalTime > 0) {
+      totalTime--; // Decrease total time
+    } else {
+      
+      console.log('Time is up!');
+      io.emit('endTimer');
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }, 1000);
+}
+
+function resetTimer() {
+  clearInterval(timerInterval); // Stop any running timer
+  timerInterval = null;
+  totalTime = 10 * 60; // Reset timer
+}
+
+// Listen for timer events from the server
+socket.on('startTimer', () => {
+  console.log('Timer started!');
+  startTimer(); // Start the timer
+});
+
+socket.on('resetTimer', () => {
+  console.log('Timer reset!');
+  resetTimer(); // Reset the timer
+});
 
 function drawTimer() {
   const minutes = Math.floor(totalTime / 60);
@@ -43,17 +105,19 @@ function drawTimer() {
   const boxX = canvas.width / 2 - boxWidth / 2;
   const boxY = 10;
 
-  // Draw the glowing box background
-  c.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  // Draw the silver box background
+  c.fillStyle = 'rgba(14, 14, 14, 0.91)'; // Silver with slight transparency
   c.fillRect(boxX, boxY, boxWidth, boxHeight);
 
   // Add glowing effect to the box
-  c.shadowColor = 'red';
+  c.shadowColor = 'silver'; // Glow color
   c.shadowBlur = 15;
   c.lineWidth = 5;
-  c.strokeStyle = 'red';
+  c.strokeStyle = 'rgba(169, 169, 169, 0.9)'; // Darker silver for the border
   c.strokeRect(boxX, boxY, boxWidth, boxHeight);
-  c.shadowColor = 'transparent'; // Reset shadow for text
+
+  // Reset shadow effect for text
+  c.shadowColor = 'transparent';
 
   // Draw the timer text inside the box
   c.font = '40px Arial'; // Font size and family
@@ -68,14 +132,8 @@ function drawTimer() {
 
 
 
-setInterval(() => {
-  if (totalTime > 0) {
-    totalTime--; // Decrease total time
-  } else {
-    console.log('Time is up!');
-    clearInterval(); // Optional: Stop timer logic
-  }
-}, 1000);
+
+
 
 // Play the music when the button is clicked
 startMusicButton.addEventListener('click', () => {
@@ -173,6 +231,7 @@ socket.on('groupUpdate', (groups) => {
   }
 });
 
+
 // Emit mingle request
 function checkMingle() {
   for (const id1 in players) {
@@ -231,8 +290,9 @@ let animationId
  
 function animate() {
   animationId = requestAnimationFrame(animate)
-  c.fillStyle = 'rgba(234, 88, 31, 0.1)'
-  c.clearRect(0, 0, canvas.width, canvas.height);
+  c.fillStyle = 'rgba(248, 174, 94, 0.76)'; // Light orange with transparency
+  c.fillRect(0, 0, canvas.width, canvas.height); // Fill the background with a fading effect
+
   horse.update()
   horse.draw()
 
@@ -267,19 +327,19 @@ const keys={
 
 setInterval(() => { 
   if(keys.w.pressed){
-    players[socket.id].y -= 10
+    players[socket.id].y -= 5
     socket.emit('keydown','KeyW')
   }
   if(keys.a.pressed){
-    players[socket.id].x -= 10
+    players[socket.id].x -= 5
     socket.emit('keydown','KeyA')
   }
   if(keys.s.pressed){
-    players[socket.id].y += 10
+    players[socket.id].y += 5
     socket.emit('keydown','KeyS')
   }
   if(keys.d.pressed){
-    players[socket.id].x += 10
+    players[socket.id].x += 5
     socket.emit('keydown','KeyD')
   }
   

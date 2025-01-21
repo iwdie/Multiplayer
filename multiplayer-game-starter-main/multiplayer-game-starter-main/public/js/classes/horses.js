@@ -21,11 +21,19 @@ class horses {
         c.translate(this.x, this.y); // Move the canvas origin to the image's center
         c.rotate(this.angle); // Rotate the canvas
   
+
+        c.beginPath();
+        c.arc(0, 0, this.width * 1.6, 0, Math.PI * 2); // Slightly larger than the image
+        c.fillStyle = "rgb(214, 89, 0)"; // Fill with orange color
+        c.fill();
+        c.closePath();
+  
+
         // Set glow effect
-        c.shadowBlur = 11; // Intensity of the glow
+        c.shadowBlur = 25; // Intensity of the glow
         c.shadowColor = this.glowColor; // Color of the glow
-        c.shadowOffsetX = 0; // No horizontal shadow offset
-        c.shadowOffsetY = 0; // No vertical shadow offset
+        c.shadowOffsetX = 2; // No horizontal shadow offset
+        c.shadowOffsetY = 2; // No vertical shadow offset
   
         // Draw the image with the glow effect
         c.drawImage(
