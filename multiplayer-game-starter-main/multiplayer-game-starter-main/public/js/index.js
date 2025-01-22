@@ -55,7 +55,7 @@ socket.on('gameOver', (data) => {
 });
 
 
-let totalTime = 10 * 60; // Total time in seconds (e.g., 10 minutes)
+let totalTime = 2*60; // Total time in seconds (e.g., 10 minutes)
 let timerInterval = null; // Store the timer interval
 
 function startTimer() {
@@ -67,18 +67,13 @@ function startTimer() {
     } else {
       
       console.log('Time is up!');
-      io.emit('endTimer');
+      socket.emit('endTimer');
       clearInterval(timerInterval);
       timerInterval = null;
     }
   }, 1000);
 }
 
-function resetTimer() {
-  clearInterval(timerInterval); // Stop any running timer
-  timerInterval = null;
-  totalTime = 10 * 60; // Reset timer
-}
 
 // Listen for timer events from the server
 socket.on('startTimer', () => {
@@ -188,6 +183,7 @@ socket.on('mingleRequested', (data) => {
 // Handle responses from the server
 socket.on('mingleSuccess', (group) => {
   console.log('Mingle success:', group);
+  players[socket.id].mingled = true;
 
   // Optional: Highlight group members visually
 });
@@ -290,7 +286,7 @@ let animationId
  
 function animate() {
   animationId = requestAnimationFrame(animate)
-  c.fillStyle = 'rgba(248, 174, 94, 0.76)'; // Light orange with transparency
+  c.fillStyle = 'rgba(243, 206, 167, 0.76)'; // Light orange with transparency
   c.fillRect(0, 0, canvas.width, canvas.height); // Fill the background with a fading effect
 
   horse.update()

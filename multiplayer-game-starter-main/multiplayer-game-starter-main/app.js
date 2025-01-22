@@ -23,11 +23,26 @@ const groupRequests = {}; // Tracks ongoing mingle requests { requestId: { group
 let groupIdCounter = 1; // To generate unique group IDs
 
 
+
+// Function to emit gameOver signal to all connected clients
+function endTimer() {
+  console.log("Timer ended, checking for unmingled players.");
+
+  Object.entries(players).forEach(([socketId, player]) => {
+    if (!player.mingled) {
+      console.log(`Player ${player.username} did not mingle, sending gameOver signal.`);
+      io.to(socketId).emit('gameOver', { message: 'Game Over! You failed to mingle.' });
+    }
+  });
+}
+
+
+
 io.on('connection', (socket) => {
   console.log('a user connected'); 
 
   
-  socket.on('emitTimer', () => {
+  socket.on('endTimer', () => {
     endTimer();
   });
   
@@ -36,9 +51,10 @@ io.on('connection', (socket) => {
   io.emit('updatePlayers', players);
   
   socket.on('initGame', (username) => {
-    players[socket.id] = { x: 500*Math.random(), y: 500*Math.random(),username,busy: false }
+    players[socket.id] = { x: 500*Math.random(), y: 500*Math.random(),username,busy: false,mingled:false }
     playerCount++;
     if (playerCount == 5) {
+        console.log("5 players connected, starting the timer.");
        
         io.emit('startTimer'); // Notify all clients to start the timer
       
@@ -62,6 +78,7 @@ io.on('connection', (socket) => {
       }
       delete players[socket.id];
     }
+    playerCount--;
     console.log('A user disconnected');
   });
 
@@ -111,26 +128,10 @@ io.on('connection', (socket) => {
     io.to(targetId).emit('mingleRequested', { from: socket.id, username: requester.username });
   });
 
-  function endTimer() {
-    console.log('Timer ended!');
-  
-    const unmingledPlayers = Object.keys(players).filter(
-      (playerId) => !players[playerId].mingled
-    );
-  
-    // Emit 'gameOver' event to all unmingled players
-    unmingledPlayers.forEach((playerId) => {
-      io.to(playerId).emit('gameOver', { message: 'Game Over! You did not mingle in time.' });
-    });
-  
-    console.log(`Game Over sent to: ${unmingledPlayers.join(', ')}`);
-  }
   // Response to mingle request
   socket.on('respondMingle', (data) => {
     const { requestId, accepted } = data;
     const request = groupRequests[requestId];
-    players[requestId].mingled = true;
-    players[targetId].mingled = true;
 
     if (!request) return;
 
@@ -156,6 +157,7 @@ io.on('connection', (socket) => {
       }
 
       // Notify players about the successful mingle
+      players[socket.id].mingled = true;
       io.to(socket.id).emit('mingleSuccess', groups[requester.groupId]);
       io.to(targetId).emit('mingleSuccess', groups[requester.groupId]);
 
@@ -171,7 +173,7 @@ io.on('connection', (socket) => {
   });
   socket.on('playerMingled', (playerId) => {
     if (players[playerId]) {
-      players[playerId].mingled = true; // Mark the player as mingled
+      players[socket.id].mingled = true; // Mark the player as mingled
     }
   });
 
