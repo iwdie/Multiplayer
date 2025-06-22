@@ -19,7 +19,7 @@ let players = {};
 let groups = {};
 let groupRequests = {};
 let groupIdCounter = 1;
-const playerInputs = {}; // NEW: Store player input state
+const playerInputs = {}; // Store player input state
 
 const MINGLE_DURATION_SECONDS = 120;
 const OBJECTIVE_DURATION_SECONDS = 60;
@@ -28,16 +28,10 @@ const REQUIRED_PLAYER_COUNT = 5;
 let gamePhase = 'WAITING';
 let gameTimer = null;
 const safeRoom = { x: 200, y: 150, width: 400, height: 300 };
-
-// --- GAME LOGIC FUNCTIONS (Unchanged from previous version) ---
-function startGame() { /* ... same as before ... */ }
-function startObjectivePhase() { /* ... same as before ... */ }
-function endGame() { /* ... same as before ... */ }
+const PLAYER_SPEED = 5;
+const TICK_RATE = 60;
 
 // --- SERVER GAME LOOP ---
-const TICK_RATE = 60;
-const PLAYER_SPEED = 5;
-
 function gameLoop() {
   for (const id in players) {
     const inputs = playerInputs[id];
@@ -49,66 +43,134 @@ function gameLoop() {
     }
   }
 }
-
 setInterval(gameLoop, 1000 / TICK_RATE);
 // ---
 
 io.on('connection', (socket) => {
-  console.log('a user connected');
+  console.log('A user connected:', socket.id);
   
-  // Initialize a storage for this player's inputs
-  playerInputs[socket.id] = {
-    w: { pressed: false }, a: { pressed: false },
-    s: { pressed: false }, d: { pressed: false }
-  };
+  playerInputs[socket.id] = { w: {pressed:false}, a: {pressed:false}, s: {pressed:false}, d: {pressed:false} };
 
   socket.on('initGame', (username) => {
-    // ... same initGame logic ...
+    if (gamePhase !== 'WAITING') {
+        socket.emit('error', 'A game is already in progress.');
+        return;
+    }
+    players[socket.id] = {
+      x: 500 * Math.random(),
+      y: 500 * Math.random(),
+      username,
+      groupId: null,
+      busy: false,
+      isRequestSent: false,
+      isRequestReceived: false,
+      groupRequestSentTo: null
+    };
+    io.emit('updatePlayers', players);
+    if (Object.keys(players).length === REQUIRED_PLAYER_COUNT && gamePhase === 'WAITING') {
+      startGame();
+    }
   });
 
   socket.on('disconnect', () => {
-    console.log('a user disconnected');
+    console.log('A user disconnected:', socket.id);
     delete players[socket.id];
-    delete playerInputs[socket.id]; // Clean up inputs
+    delete playerInputs[socket.id];
     io.emit('updatePlayers', players);
   });
   
-  // REMOVED old 'keydown' listener
-  
-  // NEW listener for the entire keyboard state
   socket.on('input', (keys) => {
     if (playerInputs[socket.id]) {
       playerInputs[socket.id] = keys;
     }
   });
 
-  // Mingle logic remains the same
-  // ... (Your existing 'requestMingle' and 'respondMingle' socket listeners go here) ...
+  socket.on('requestMingle', (data) => {
+    if (gamePhase !== 'MINGLE') return;
+    const { targetId, type } = data;
+    const requesterId = socket.id;
+    const requester = players[requesterId];
+    const target = players[targetId];
+    if (!requester || !target || requester.busy || target.busy) return;
+    const requestId = `${requesterId}-${targetId}`;
+    requester.busy = true; target.busy = true;
+    groupRequests[requestId] = {
+      requesterId, targetId, type,
+      timeout: setTimeout(() => {
+        delete groupRequests[requestId];
+        if(players[requesterId]) players[requesterId].busy = false;
+        if(players[targetId]) players[targetId].busy = false;
+        io.to(requesterId).emit('mingleTimeout', players[targetId]?.username);
+        io.to(targetId).emit('mingleTimeout', players[requesterId]?.username);
+        io.emit('updatePlayers', players);
+      }, 10000),
+    };
+    io.to(targetId).emit('mingleRequested', { from: requesterId, username: requester.username, requestType: type });
+    io.to(requesterId).emit('mingleRequestSent', { to: targetId, username: target.username });
+    io.emit('updatePlayers', players);
+  });
+
+  socket.on('respondMingle', (data) => {
+    const { requestId, accepted } = data;
+    const request = groupRequests[requestId];
+    if (!request) return;
+    const { requesterId, targetId } = request;
+    const requester = players[requesterId];
+    const target = players[targetId];
+    clearTimeout(request.timeout);
+    delete groupRequests[requestId];
+    if(requester) requester.busy = false;
+    if(target) target.busy = false;
+    if (accepted && requester && target) {
+      let newGroupId;
+      if (!requester.groupId && !target.groupId) {
+        newGroupId = `group-${groupIdCounter++}`;
+        groups[newGroupId] = [{ id: requesterId, username: requester.username }, { id: targetId, username: target.username }];
+        requester.groupId = newGroupId; target.groupId = newGroupId;
+      } else if (!requester.groupId && target.groupId) {
+        newGroupId = target.groupId;
+        groups[newGroupId].push({ id: requesterId, username: requester.username });
+        requester.groupId = newGroupId;
+      } else if (requester.groupId && !target.groupId) {
+        newGroupId = requester.groupId;
+        groups[newGroupId].push({ id: targetId, username: target.username });
+        target.groupId = newGroupId;
+      } else if (requester.groupId && target.groupId && requester.groupId !== target.groupId) {
+        const oldGroup = groups[requester.groupId];
+        newGroupId = target.groupId;
+        groups[newGroupId].push(...oldGroup);
+        oldGroup.forEach(m => { if(players[m.id]) players[m.id].groupId = newGroupId; });
+        delete groups[requester.groupId];
+      }
+      io.emit('mingleSuccess', { groupId: newGroupId, groupMembers: groups[newGroupId] });
+      io.emit('groupUpdate', groups);
+    } else {
+      io.to(requesterId).emit('mingleDeclined', target?.username);
+      io.to(targetId).emit('mingleDeclined', requester?.username);
+    }
+    io.emit('updatePlayers', players);
+  });
 });
 
-// Update clients at a slightly different rate than the game loop
 setInterval(() => {
   if (Object.keys(players).length > 0) {
     io.emit('updatePlayers', players);
   }
-}, 15);
+}, 45); // Send updates slightly less often than game loop
 
 server.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
-
-// Helper functions (you can copy these into the server file)
 function startGame() {
-  console.log('Minimum players reached. Starting Mingle Phase.');
+  console.log('Starting Mingle Phase.');
   gamePhase = 'MINGLE';
   io.emit('gamePhaseUpdate', { phase: gamePhase, duration: MINGLE_DURATION_SECONDS });
   clearTimeout(gameTimer);
   gameTimer = setTimeout(startObjectivePhase, MINGLE_DURATION_SECONDS * 1000);
 }
-
 function startObjectivePhase() {
-  console.log('Mingle Phase over. Starting Objective Phase.');
+  console.log('Starting Objective Phase.');
   gamePhase = 'OBJECTIVE';
   let lonerId = null;
   for (const id in players) { if (!players[id].groupId) { lonerId = id; break; } }
@@ -121,9 +183,8 @@ function startObjectivePhase() {
   clearTimeout(gameTimer);
   gameTimer = setTimeout(endGame, OBJECTIVE_DURATION_SECONDS * 1000);
 }
-
 function endGame() {
-  console.log('Objective Phase over. Determining winner.');
+  console.log('Game Over.');
   gamePhase = 'GAMEOVER';
   const playersInRoom = [];
   for (const id in players) {
