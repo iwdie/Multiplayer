@@ -5,7 +5,7 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid'); // Use 'npm install uuid' to add this package
 
-const io = new Server(server, { pingInterval: 2000, pingTimeout: 5000 });
+const io = new Server(server, { pingInterval: 2000, pingTimeout: 10000 });
 const port = process.env.PORT || 3000;
 
 app.use(express.static('public'));
