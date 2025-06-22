@@ -6,7 +6,8 @@ const { Server } = require('socket.io');
 
 const io = new Server(server, { pingInterval: 2000, pingTimeout: 5000 });
 
-const port = 3000;
+// --- DEPLOYMENT FIX: Use Render's port, or 3000 for local testing ---
+const port = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
@@ -20,26 +21,23 @@ let groups = {};
 let groupRequests = {};
 let groupIdCounter = 1;
 
-const MINGLE_DURATION_SECONDS = 120; // 2 minutes for mingling
-const OBJECTIVE_DURATION_SECONDS = 60; // 1 minute for the objective
+const MINGLE_DURATION_SECONDS = 120;
+const OBJECTIVE_DURATION_SECONDS = 60;
 const REQUIRED_PLAYER_COUNT = 5;
 
 let gamePhase = 'WAITING'; // WAITING, MINGLE, OBJECTIVE, GAMEOVER
 let gameTimer = null;
-const safeRoom = { x: 200, y: 150, width: 400, height: 300 }; // The safe room definition
+const safeRoom = { x: 200, y: 150, width: 400, height: 300 };
 
 // --- GAME LOGIC FUNCTIONS ---
 
 function startGame() {
   console.log('Minimum players reached. Starting Mingle Phase.');
   gamePhase = 'MINGLE';
-  // Notify all clients that the game is starting
   io.emit('gamePhaseUpdate', {
     phase: gamePhase,
     duration: MINGLE_DURATION_SECONDS
   });
-
-  // Set a timer for the Mingle Phase
   clearTimeout(gameTimer);
   gameTimer = setTimeout(startObjectivePhase, MINGLE_DURATION_SECONDS * 1000);
 }
@@ -48,7 +46,6 @@ function startObjectivePhase() {
   console.log('Mingle Phase over. Starting Objective Phase.');
   gamePhase = 'OBJECTIVE';
 
-  // Find and eliminate the "loner"
   let lonerId = null;
   for (const id in players) {
     if (!players[id].groupId) {
@@ -60,9 +57,8 @@ function startObjectivePhase() {
   if (lonerId) {
     console.log(`Eliminating loner: ${players[lonerId]?.username || 'a player'}`);
     delete players[lonerId];
-    io.emit('playerEliminated', lonerId); // Notify clients to remove the player
+    io.emit('playerEliminated', lonerId);
   } else if (Object.keys(players).length > 4) {
-      // Fallback in case groups didn't form perfectly, eliminate one player
       const playerIds = Object.keys(players);
       const playerToEliminateId = playerIds[Math.floor(Math.random() * playerIds.length)];
       console.log(`No single loner found, eliminating random player: ${players[playerToEliminateId]?.username}`);
@@ -70,14 +66,10 @@ function startObjectivePhase() {
       io.emit('playerEliminated', playerToEliminateId);
   }
 
-
-  // Notify remaining clients about the new phase
   io.emit('gamePhaseUpdate', {
     phase: gamePhase,
     duration: OBJECTIVE_DURATION_SECONDS
   });
-
-  // Set a timer for the Objective Phase
   clearTimeout(gameTimer);
   gameTimer = setTimeout(endGame, OBJECTIVE_DURATION_SECONDS * 1000);
 }
@@ -89,7 +81,6 @@ function endGame() {
   const playersInRoom = [];
   for (const id in players) {
     const player = players[id];
-    // Check if player is inside the safe room boundaries
     if (
       player.x > safeRoom.x && player.x < safeRoom.x + safeRoom.width &&
       player.y > safeRoom.y && player.y < safeRoom.y + safeRoom.height
@@ -99,10 +90,8 @@ function endGame() {
   }
 
   let winningGroup = false;
-  // Check if exactly 4 players are in the room
   if (playersInRoom.length === 4) {
     const firstGroupId = playersInRoom[0].groupId;
-    // Check if the groupId is valid and if all players share it
     if (firstGroupId && playersInRoom.every(p => p.groupId === firstGroupId)) {
       winningGroup = true;
     }
@@ -113,14 +102,12 @@ function endGame() {
     io.emit('gameOver', { message: 'Your group survived!' });
   } else {
     console.log('No group survived.');
-    // Eliminate all remaining players if they failed
     for (const id in players){
         io.emit('playerEliminated', id);
     }
     io.emit('gameOver', { message: 'Your group failed to assemble in time!' });
   }
 }
-
 
 io.on('connection', (socket) => {
   console.log('a user connected');
@@ -141,10 +128,8 @@ io.on('connection', (socket) => {
       groupRequestSentTo: null
     };
 
-    // Notify all clients of the new player
     io.emit('updatePlayers', players);
 
-    // Check if we have enough players to start the game
     if (Object.keys(players).length === REQUIRED_PLAYER_COUNT && gamePhase === 'WAITING') {
       startGame();
     }
@@ -163,12 +148,10 @@ io.on('connection', (socket) => {
       delete players[socket.id];
       io.emit('updatePlayers', players);
     }
-    // Note: Add logic here to handle disconnects during an active game, e.g., reset or end game.
   });
   
   socket.on('keydown', (keycode) => {
     if (!players[socket.id]) return;
-
     switch (keycode) {
       case 'KeyW': players[socket.id].y -= 5; break;
       case 'KeyA': players[socket.id].x -= 5; break;
@@ -178,51 +161,30 @@ io.on('connection', (socket) => {
   });
 
   socket.on('requestMingle', (data) => {
-    if (gamePhase !== 'MINGLE') return; // Mingle requests only allowed during Mingle phase
-
+    if (gamePhase !== 'MINGLE') return;
     const { targetId, type } = data;
     const requesterId = socket.id;
     const requester = players[requesterId];
     const target = players[targetId];
-
-    if (!requester || !target) return;
-    if (requester.busy || target.busy || requester.isRequestSent || target.isRequestReceived) return;
+    if (!requester || !target || requester.busy || target.busy) return;
 
     const requestId = `${requesterId}-${targetId}`;
     requester.busy = true;
     target.busy = true;
-    requester.isRequestSent = true;
-    requester.groupRequestSentTo = targetId;
-    target.isRequestReceived = true;
-
     groupRequests[requestId] = {
       requesterId,
       targetId,
       type,
       timeout: setTimeout(() => {
         delete groupRequests[requestId];
-        if (players[requesterId]) {
-          players[requesterId].busy = false;
-          players[requesterId].isRequestSent = false;
-          players[requesterId].groupRequestSentTo = null;
-        }
-        if (players[targetId]) {
-          players[targetId].busy = false;
-          players[targetId].isRequestReceived = false;
-        }
+        if (players[requesterId]) players[requesterId].busy = false;
+        if (players[targetId]) players[targetId].busy = false;
         io.to(requesterId).emit('mingleTimeout', players[targetId]?.username);
         io.to(targetId).emit('mingleTimeout', players[requesterId]?.username);
         io.emit('updatePlayers', players);
       }, 10000),
     };
-
-    io.to(targetId).emit('mingleRequested', {
-      from: requesterId,
-      username: requester.username,
-      requestType: type,
-      requesterGroupId: requester.groupId
-    });
-
+    io.to(targetId).emit('mingleRequested', { from: requesterId, username: requester.username, requestType: type });
     io.to(requesterId).emit('mingleRequestSent', { to: targetId, username: target.username });
     io.emit('updatePlayers', players);
   });
@@ -230,9 +192,7 @@ io.on('connection', (socket) => {
   socket.on('respondMingle', (data) => {
     const { requestId, accepted } = data;
     const request = groupRequests[requestId];
-
     if (!request) return;
-
     const { requesterId, targetId } = request;
     const requester = players[requesterId];
     const target = players[targetId];
@@ -240,23 +200,15 @@ io.on('connection', (socket) => {
     clearTimeout(request.timeout);
     delete groupRequests[requestId];
 
-    if (requester) {
-      requester.busy = false;
-      requester.isRequestSent = false;
-      requester.groupRequestSentTo = null;
-    }
-    if (target) {
-      target.busy = false;
-      target.isRequestReceived = false;
-    }
+    if (requester) requester.busy = false;
+    if (target) target.busy = false;
 
     if (accepted && requester && target) {
       let newGroupId;
       if (!requester.groupId && !target.groupId) {
         newGroupId = `group-${groupIdCounter++}`;
         groups[newGroupId] = [];
-        groups[newGroupId].push({ id: requesterId, username: requester.username });
-        groups[newGroupId].push({ id: targetId, username: target.username });
+        groups[newGroupId].push({ id: requesterId, username: requester.username }, { id: targetId, username: target.username });
         requester.groupId = newGroupId;
         target.groupId = newGroupId;
       } else if (!requester.groupId && target.groupId) {
@@ -271,13 +223,11 @@ io.on('connection', (socket) => {
         const oldRequesterGroup = groups[requester.groupId];
         newGroupId = target.groupId;
         groups[newGroupId].push(...oldRequesterGroup);
-        oldRequesterGroup.forEach(member => {
-          if(players[member.id]) players[member.id].groupId = newGroupId;
-        });
+        oldRequesterGroup.forEach(member => { if(players[member.id]) players[member.id].groupId = newGroupId; });
         delete groups[requester.groupId];
         requester.groupId = newGroupId;
       } else {
-        io.to(socket.id).emit('mingleError', 'Both players are already in the same group.');
+        io.to(socket.id).emit('mingleError', 'Already in the same group.');
         io.emit('updatePlayers', players);
         return;
       }
@@ -290,7 +240,6 @@ io.on('connection', (socket) => {
     io.emit('updatePlayers', players);
   });
 });
-
 
 setInterval(() => {
   if (Object.keys(players).length > 0) {
