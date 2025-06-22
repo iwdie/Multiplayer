@@ -16,87 +16,79 @@
         font-size: 14px;
         user-select: none;
       "
-    >
-      
-    </div>
+    ></div>
     <canvas></canvas>
 
-    
-  
-  
-       
-
-      <!-- username input -->
-      <div
-        style="
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: absolute;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          left: 0;
-        "
-      >
-        <form id="usernameForm">
-          <div>
-            <input
-              id="usernameInput"
-              type="text"
-              placeholder="Player_No"
-              style="
-                padding: 12px;
-                border-radius: 4px;
-                border: none;
-                background: #475569;
-                color: #cbd5e1;
-              "
-            />
-          </div>
-          <div style="text-align: center; margin-top: 8px">
-            <button
-              style="
-                padding: 8px 20px;
-                border-radius: 4px;
-                border: none;
-                background-image: linear-gradient(
-                  to right,
-                  rgb(212, 6, 95),
-                  rgb(246, 59, 174)
-                );
-                color: white;
-                cursor: pointer;
-              "
-            >
+    <div
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+      "
+    >
+      <form id="usernameForm">
+        <div>
+          <input
+            id="usernameInput"
+            type="text"
+            placeholder="Player_No"
+            style="
+              padding: 12px;
+              border-radius: 4px;
+              border: none;
+              background: #475569;
+              color: #cbd5e1;
+            "
+          />
+        </div>
+        <div style="text-align: center; margin-top: 8px">
+          <button
+            style="
+              padding: 8px 20px;
+              border-radius: 4px;
+              border: none;
+              background-image: linear-gradient(
+                to right,
+                rgb(212, 6, 95),
+                rgb(246, 59, 174)
+              );
+              color: white;
+              cursor: pointer;
+            "
+          >
             ○ △ □
-            </button>
-          </div>
-        </form>
-      </div>
-      <!-- username input end -->
+          </button>
+        </div>
+      </form>
     </div>
-    <!-- Add a div to display group details -->
-<div id="groupPanel" style="
-position: absolute;
-top: 10px;
-right: 10px;
-width: 300px;
-max-height: 500px;
-overflow-y: auto;
-background-color: rgba(0, 0, 0, 0.8);
-color: white;
-padding: 15px;
-border-radius: 8px;
-box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
-font-family: Arial, sans-serif;
-font-size: 14px;
-z-index: 100;
-">
-<h3 style="text-align: center; color: rgb(255, 0, 149);">Groups</h3>
-<div id="groupList"></div>
-</div>
-
+    <div
+      id="groupPanel"
+      style="
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 300px;
+        max-height: 500px;
+        overflow-y: auto;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        z-index: 100;
+      "
+    >
+      <h3 style="text-align: center; color: rgb(255, 0, 149)">Groups</h3>
+      <div id="myGroupInfo" style="margin-bottom: 20px;"></div>
+      <div id="groupList"></div>
+    </div>
 
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.2/gsap.min.js"
@@ -104,21 +96,14 @@ z-index: 100;
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     ></script>
-    
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.2/gsap.min.js"
-      integrity="sha512-kVlGhj2qFy+KBCFuvjBJTGUMxbdqJKs4yK2jh0e0VPhWUPiPC87bzm4THmaaIee3Oj7j6sDpTTgm2EPPiESqBg=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    ></script>
+
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    
+
     <script src="./js/classes/Player.js"></script>
     <script src="./js/classes/horses.js"></script>
-    
-    
+    <script src="./js/classes/Room.js"></script>
+
     <script src="./js/eventListeners.js"></script>
     <script src="./js/index.js"></script>
   </body>
 </html>
-

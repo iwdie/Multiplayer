@@ -2,26 +2,31 @@ const canvas = document.querySelector('canvas')
 const c = canvas.getContext('2d')
 
 const socket = io()
-const scoreEl = document.querySelector('#scoreEl')
 
 canvas.width = innerWidth
 canvas.height = innerHeight
 
+// --- NEW CLIENT-SIDE STATE VARIABLES ---
+let gamePhase = 'WAITING';
+let timerValue = 0;
+let clientTimerInterval = null;
+
 const x = canvas.width / 2
 const y = canvas.height / 2
-const player = new Player(x, y, 50, 50,'./images/image (2).png')
-const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)')
+const players = {}; // This will hold all player objects
 
-const backgroundMusic = new Audio('./sounds/mingle_sound.mp3'); // Path to your music file
-backgroundMusic.loop = true; // Enable looping
-backgroundMusic.volume = 0.5; // Adjust volume (range: 0.0 to 1.0)
+// --- GAME OBJECTS ---
+const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)');
+const safeRoom = new Room(100, 150, 400, 300, 'rgba(0, 255, 0, 0.15)');
+const backgroundMusic = new Audio('./sounds/mingle_sound.mp3');
+backgroundMusic.loop = true;
+backgroundMusic.volume = 0.5;
 
-// Add a button for the user to start the music
-
+// --- UI ELEMENTS ---
 const startMusicButton = document.createElement('button');
-startMusicButton.style.backgroundColor= 'black';
-startMusicButton.textContent = '🎶';
-startMusicButton.color = 'color:  rgb(241, 23, 150)';
+startMusicButton.style.backgroundColor = 'black';
+startMusicButton.textContent = '�';
+startMusicButton.style.color = 'rgb(241, 23, 150)';
 startMusicButton.style.position = 'absolute';
 startMusicButton.style.top = '10px';
 startMusicButton.style.left = '10px';
@@ -30,10 +35,36 @@ startMusicButton.style.fontSize = '16px';
 startMusicButton.style.cursor = 'pointer';
 document.body.appendChild(startMusicButton);
 
-socket.on('gameOver', (data) => {
-  console.log(data.message); // Log the message from the server
+// --- SOCKET EVENT LISTENERS ---
 
-  // Display Game Over message
+// Listens for game phase changes from the server
+socket.on('gamePhaseUpdate', (data) => {
+  console.log(`New game phase: ${data.phase}, Duration: ${data.duration}`);
+  gamePhase = data.phase;
+  timerValue = data.duration;
+
+  if (clientTimerInterval) clearInterval(clientTimerInterval);
+
+  if (gamePhase === 'MINGLE' || gamePhase === 'OBJECTIVE') {
+    clientTimerInterval = setInterval(() => {
+      if (timerValue > 0) {
+        timerValue--;
+      }
+    }, 1000);
+  }
+});
+
+// Listens for a player being eliminated
+socket.on('playerEliminated', (playerId) => {
+  console.log(`Player ${playerId} was eliminated.`);
+  if (players[playerId]) {
+    delete players[playerId];
+  }
+});
+
+// Handles the final game over message
+socket.on('gameOver', (data) => {
+  console.log(data.message);
   const gameOverScreen = document.createElement('div');
   gameOverScreen.style.position = 'absolute';
   gameOverScreen.style.top = '50%';
@@ -46,344 +77,221 @@ socket.on('gameOver', (data) => {
   gameOverScreen.style.borderRadius = '10px';
   gameOverScreen.style.textAlign = 'center';
   gameOverScreen.style.boxShadow = '0 0 15px red';
-
   gameOverScreen.innerHTML = `<p>${data.message}</p>`;
   document.body.appendChild(gameOverScreen);
 
-  // Stop further interactions (optional)
-  cancelAnimationFrame(animationId); // Stop the animation
+  cancelAnimationFrame(animationId);
 });
 
-
-let totalTime = 2*60; // Total time in seconds (e.g., 10 minutes)
-let timerInterval = null; // Store the timer interval
-
-function startTimer() {
-  if (timerInterval) return; // Prevent multiple timers
-
-  timerInterval = setInterval(() => {
-    if (totalTime > 0) {
-      totalTime--; // Decrease total time
-    } else {
-      
-      console.log('Time is up!');
-      socket.emit('endTimer');
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-  }, 1000);
-}
-
-
-// Listen for timer events from the server
-socket.on('startTimer', () => {
-  console.log('Timer started!');
-  startTimer(); // Start the timer
-});
-
-socket.on('resetTimer', () => {
-  console.log('Timer reset!');
-  resetTimer(); // Reset the timer
-});
-
-function drawTimer() {
-  const minutes = Math.floor(totalTime / 60);
-  const seconds = totalTime % 60;
-
-  const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds
-    .toString()
-    .padStart(2, '0')}`;
-
-  // Set the box style (glowing effect)
-  const boxWidth = 200;
-  const boxHeight = 60;
-  const boxX = canvas.width / 2 - boxWidth / 2;
-  const boxY = 10;
-
-  // Draw the silver box background
-  c.fillStyle = 'rgba(14, 14, 14, 0.91)'; // Silver with slight transparency
-  c.fillRect(boxX, boxY, boxWidth, boxHeight);
-
-  // Add glowing effect to the box
-  c.shadowColor = 'silver'; // Glow color
-  c.shadowBlur = 15;
-  c.lineWidth = 5;
-  c.strokeStyle = 'rgba(169, 169, 169, 0.9)'; // Darker silver for the border
-  c.strokeRect(boxX, boxY, boxWidth, boxHeight);
-
-  // Reset shadow effect for text
-  c.shadowColor = 'transparent';
-
-  // Draw the timer text inside the box
-  c.font = '40px Arial'; // Font size and family
-  c.textAlign = 'center'; // Center align the text
-  c.fillStyle = 'red'; // Text color
-  c.fillText(formattedTime, canvas.width / 2, boxY + boxHeight / 2 + 10); // Position the text
-
-  // Reset the shadow effect to avoid applying it elsewhere
-  c.shadowBlur = 0;
-}
-
-
-
-
-
-
-
-// Play the music when the button is clicked
-startMusicButton.addEventListener('click', () => {
-  backgroundMusic.play()
-    .then(() => {
-      console.log('Background music started');
-      startMusicButton.style.display = 'none'; // Hide the button after music starts
-    })
-    .catch((error) => {
-      console.error('Error playing background music:', error);
-    });
-});
-
-const players = {}
-
+// Keeps the local 'players' object in sync with the server's
 socket.on('updatePlayers', (BackendPlayers) => {
- for (const id in BackendPlayers) {
-    const player = BackendPlayers[id]
-    players[id] = new Player(player.x, player.y, 50,50, './images/image (2).png')
-  
-  if(!players[id]){
-    players[id] = new Player(x, y, 50, 50, './images/image (2).png')
-  }
-  else{
-    players[id].x = player.x
-    players[id].y = player.y
-  }
-}
-   for (const id in players){
-    if(!BackendPlayers[id]){
-      delete players[id]
+  for (const id in BackendPlayers) {
+    const backendPlayer = BackendPlayers[id];
+
+    if (!players[id]) {
+      players[id] = new Player(backendPlayer.x, backendPlayer.y, 50, 50, './images/image (2).png');
     }
-   }
-
-
-});
-
-let isDialogOpen = false; // Track dialog status
-// Handle group updates
-socket.on('groupUpdate', (groups) => {
-  console.log('Group updates received:', groups);
-
-  // Optional: Visualize groups (e.g., display in a sidebar)
-});
-
-// Handle mingle requests
-socket.on('mingleRequested', (data) => {
-  const { from, username } = data;
-  openMingleDialog({ id: from, username });
-});
-
-// Handle responses from the server
-socket.on('mingleSuccess', (group) => {
-  console.log('Mingle success:', group);
-  players[socket.id].mingled = true;
-
-  // Optional: Highlight group members visually
-});
-
-socket.on('mingleDeclined', (username) => {
-  console.log(`${username} declined the mingle request.`);
-});
-
-socket.on('mingleTimeout', () => {
-  console.log('Mingle request timed out.');
-});
-
-socket.on('groupUpdate', (groups) => {
-  const groupList = document.querySelector('#groupList');
-  groupList.innerHTML = ''; // Clear previous group data
-
-  if (Object.keys(groups).length === 0) {
-    groupList.innerHTML = '<p style="text-align: center;">No groups yet.</p>';
-    return;
+    
+    const clientPlayer = players[id];
+    clientPlayer.x = backendPlayer.x;
+    clientPlayer.y = backendPlayer.y;
+    clientPlayer.groupId = backendPlayer.groupId;
+    clientPlayer.busy = backendPlayer.busy;
+    clientPlayer.isRequestReceived = backendPlayer.isRequestReceived;
+    clientPlayer.username = backendPlayer.username;
   }
-
-  for (const groupId in groups) {
-    const group = groups[groupId];
-    const groupDiv = document.createElement('div');
-    groupDiv.style.marginBottom = '15px';
-    groupDiv.style.padding = '10px';
-    groupDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-    groupDiv.style.borderRadius = '5px';
-    groupDiv.style.boxShadow = '0 0 5px rgba(255, 255, 255, 0.2)';
-
-    groupDiv.innerHTML = `
-      <strong style="color:  rgb(255, 0, 149);">Group ID:</strong> ${groupId}<br>
-      <strong style="color:  rgb(255, 0, 149);">Members:</strong>
-      <ul style="margin: 5px 0; padding-left: 20px; list-style: disc;">
-        ${group
-          .map((member) => `<li>${member.username} (Player ${member.id})</li>`)
-          .join('')}
-      </ul>
-    `;
-    groupList.appendChild(groupDiv);
+  for (const id in players) {
+    if (!BackendPlayers[id]) {
+      delete players[id];
+    }
   }
 });
 
+// Music button listener
+startMusicButton.addEventListener('click', () => {
+  backgroundMusic.play().catch(error => console.error('Error playing music:', error));
+  startMusicButton.style.display = 'none';
+});
 
-// Emit mingle request
-function checkMingle() {
-  for (const id1 in players) {
-    for (const id2 in players) {
-      if (id1 !== id2) {
-        const player1 = players[id1];
-        const player2 = players[id2];
+// --- MINGLE LOGIC (Largely unchanged) ---
+let isDialogOpen = false;
+let currentMingleTargetId = null;
 
-        if (player1.isMinglingWith(player2) && !isDialogOpen) {
-          socket.emit('requestMingle', id2);
-          return; // Exit once a request is emitted
+socket.on('groupUpdate', (groups) => {
+    // This function remains the same as your provided code
+    const groupList = document.querySelector('#groupList');
+    const myGroupInfo = document.querySelector('#myGroupInfo');
+    groupList.innerHTML = '';
+    myGroupInfo.innerHTML = '';
+    const localPlayer = players[socket.id];
+    let inAGroup = false;
+    if (localPlayer && localPlayer.groupId && groups[localPlayer.groupId]) {
+        inAGroup = true;
+        const myGroup = groups[localPlayer.groupId];
+        myGroupInfo.innerHTML = `<h4 style="color: rgb(255, 0, 149); text-align: center;">My Group: ${localPlayer.groupId}</h4><ul style="margin: 5px 0; padding-left: 20px; list-style: disc;">${myGroup.map((member) => `<li>${players[member.id]?.username || '...'} ${member.id === socket.id ? '(You)' : ''}</li>`).join('')}</ul>`;
+    } else {
+        myGroupInfo.innerHTML = '<p style="text-align: center;">Not currently in a group.</p>';
+    }
+    const otherGroupsDiv = document.createElement('div');
+    otherGroupsDiv.innerHTML = '<h3 style="text-align: center; color: rgb(255, 0, 149);">Other Groups</h3>';
+    if (Object.keys(groups).length === 0 || (Object.keys(groups).length === 1 && inAGroup)) {
+        otherGroupsDiv.innerHTML += '<p style="text-align: center;">No other groups yet.</p>';
+    } else {
+        for (const groupId in groups) {
+            if (localPlayer && groupId === localPlayer.groupId) continue;
+            const group = groups[groupId];
+            const groupDiv = document.createElement('div');
+            groupDiv.style.cssText = "margin-bottom: 15px; padding: 10px; background-color: rgba(255, 255, 255, 0.1); border-radius: 5px; box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);";
+            groupDiv.innerHTML = `<strong style="color: rgb(255, 0, 149);">Group ID:</strong> ${groupId}<br><strong style="color: rgb(255, 0, 149);">Members:</strong><ul style="margin: 5px 0; padding-left: 20px; list-style: disc;">${group.map((member) => `<li>${players[member.id]?.username || '...'}</li>`).join('')}</ul>`;
+            otherGroupsDiv.appendChild(groupDiv);
         }
-      }
+    }
+    groupList.appendChild(otherGroupsDiv);
+});
+
+socket.on('mingleRequested', (data) => {
+    if (isDialogOpen) return;
+    const { from, username, requestType } = data;
+    currentMingleTargetId = from;
+    let dialogText = '';
+    switch (requestType) {
+        case 'newGroup': dialogText = `${username} wants to form a new group with you! Do you accept?`; break;
+        case 'joinGroup': dialogText = `${username} wants to join your group! Do you accept?`; break;
+        case 'inviteToGroup': dialogText = `${username} invites you to join their group! Do you accept?`; break;
+        case 'mergeGroups': dialogText = `${username} from another group wants to merge with yours! Do you accept?`; break;
+        default: dialogText = `${username} wants to mingle! Do you accept?`;
+    }
+    openMingleDialog(from, username, dialogText);
+});
+
+socket.on('mingleRequestSent', (data) => showTemporaryMessage(`Request sent to ${data.username}.`));
+socket.on('mingleSuccess', () => showTemporaryMessage('Mingle successful! You are now in a group.'));
+socket.on('mingleDeclined', (username) => showTemporaryMessage(`${username} declined your request.`));
+socket.on('mingleTimeout', (username) => showTemporaryMessage(`Mingle request to ${username} timed out.`));
+socket.on('mingleError', (message) => showTemporaryMessage(`Mingle Error: ${message}`));
+
+function checkMingle() {
+  const localPlayer = players[socket.id];
+  if (!localPlayer || isDialogOpen || currentMingleTargetId) return;
+  for (const id in players) {
+    if (id === socket.id) continue;
+    const otherPlayer = players[id];
+    if (otherPlayer.busy || otherPlayer.isRequestReceived) continue;
+    if (localPlayer.isMinglingWith(otherPlayer) && !(localPlayer.groupId && localPlayer.groupId === otherPlayer.groupId)) {
+        let requestType = '';
+        if (!localPlayer.groupId && !otherPlayer.groupId) requestType = 'newGroup';
+        else if (localPlayer.groupId && !otherPlayer.groupId) requestType = 'inviteToGroup';
+        else if (!localPlayer.groupId && otherPlayer.groupId) requestType = 'joinGroup';
+        else requestType = 'mergeGroups';
+        if (requestType) {
+            socket.emit('requestMingle', { targetId: id, type: requestType });
+            currentMingleTargetId = id;
+            return;
+        }
     }
   }
 }
 
-// Adjust mingle dialog
-function openMingleDialog(request) {
-  isDialogOpen = true;
-
-  const dialog = document.createElement('div');
-  dialog.style.position = 'absolute';
-  dialog.style.top = '50%';
-  dialog.style.left = '50%';
-  dialog.style.transform = 'translate(-50%, -50%)';
-  dialog.style.padding = '20px';
-  dialog.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-  dialog.style.color = 'white';
-  dialog.style.borderRadius = '4px';
-  dialog.style.textAlign = 'center';
-  dialog.style.boxShadow = '0 0 15px pink';
-
-  dialog.innerHTML = `
-    <p>${request.username} wants to mingle! Do you accept?</p>
-    <button id="mingleYes" style="margin: 10px; padding: 10px; background-color: blue; color: white;">Yes</button>
-    <button id="mingleNo" style="margin: 10px; padding: 10px; background-color: red; color: white;">No</button>
-  `;
-  document.body.appendChild(dialog);
-
-  document.getElementById('mingleYes').onclick = () => {
-    socket.emit('respondMingle', { requestId: `${request.id}-${socket.id}`, accepted: true });
-    document.body.removeChild(dialog);
-    isDialogOpen = false;
-  };
-
-  document.getElementById('mingleNo').onclick = () => {
-    socket.emit('respondMingle', { requestId: `${request.id}-${socket.id}`, accepted: false });
-    document.body.removeChild(dialog);
-    isDialogOpen = false;
-  };
+function openMingleDialog(fromPlayerId, fromUsername, dialogMessage) {
+    isDialogOpen = true;
+    const dialog = document.createElement('div');
+    dialog.id = 'mingleDialog';
+    dialog.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background-color: rgba(0, 0, 0, 0.8); color: white; border-radius: 4px; text-align: center; box-shadow: 0 0 15px pink; z-index: 200;";
+    dialog.innerHTML = `<p>${dialogMessage}</p><button id="mingleYes" style="margin: 10px; padding: 10px; background-color: blue; color: white; cursor: pointer;">Yes</button><button id="mingleNo" style="margin: 10px; padding: 10px; background-color: red; color: white; cursor: pointer;">No</button>`;
+    document.body.appendChild(dialog);
+    const closeDialog = () => {
+        document.body.removeChild(dialog);
+        isDialogOpen = false;
+        currentMingleTargetId = null;
+    };
+    document.getElementById('mingleYes').onclick = () => {
+        socket.emit('respondMingle', { requestId: `${fromPlayerId}-${socket.id}`, accepted: true });
+        closeDialog();
+    };
+    document.getElementById('mingleNo').onclick = () => {
+        socket.emit('respondMingle', { requestId: `${fromPlayerId}-${socket.id}`, accepted: false });
+        closeDialog();
+    };
 }
 
+function showTemporaryMessage(message) {
+    const msgDiv = document.createElement('div');
+    msgDiv.style.cssText = "position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); padding: 10px 20px; background-color: rgba(0, 0, 0, 0.7); color: white; border-radius: 5px; z-index: 300;";
+    msgDiv.textContent = message;
+    document.body.appendChild(msgDiv);
+    setTimeout(() => { if (msgDiv.parentNode) { msgDiv.parentNode.removeChild(msgDiv); } }, 3000);
+}
 
-let animationId
- 
+// --- NEW, UPDATED TIMER DRAWING FUNCTION ---
+function drawTimer() {
+  if (gamePhase === 'WAITING' || gamePhase === 'GAMEOVER') return;
+
+  const minutes = Math.floor(timerValue / 60);
+  const seconds = timerValue % 60;
+  const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  
+  const boxWidth = 200, boxHeight = 60, boxX = canvas.width / 2 - boxWidth / 2, boxY = 10;
+  
+  c.fillStyle = 'rgba(14, 14, 14, 0.91)';
+  c.fillRect(boxX, boxY, boxWidth, boxHeight);
+  c.shadowColor = 'silver'; c.shadowBlur = 15; c.lineWidth = 5;
+  c.strokeStyle = 'rgba(169, 169, 169, 0.9)';
+  c.strokeRect(boxX, boxY, boxWidth, boxHeight);
+  c.shadowColor = 'transparent'; c.shadowBlur = 0;
+  
+  c.font = '40px Arial'; c.textAlign = 'center'; c.fillStyle = 'red';
+  c.fillText(formattedTime, canvas.width / 2, boxY + boxHeight / 2 + 10);
+}
+
+// --- MAIN ANIMATE LOOP ---
+let animationId;
 function animate() {
-  animationId = requestAnimationFrame(animate)
-  c.fillStyle = 'rgba(243, 206, 167, 0.76)'; // Light orange with transparency
-  c.fillRect(0, 0, canvas.width, canvas.height); // Fill the background with a fading effect
+  animationId = requestAnimationFrame(animate);
+  c.fillStyle = 'rgba(243, 206, 167, 0.76)';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+  
+  safeRoom.draw();
+  horse.update();
+  horse.draw();
 
-  horse.update()
-  horse.draw()
-
-  checkMingle();
+  // Mingle logic only runs during the MINGLE phase
+  if (gamePhase === 'MINGLE') {
+    checkMingle();
+  }
 
   for (const id in players) {
-      const player = players[id]
-      player.draw()
+    players[id].draw();
   }
 
-  drawTimer(); // Draw the timer on the canvas
-
-   
+  drawTimer();
 }
 
-animate()
+// --- KEYBOARD CONTROLS ---
+const keys = { w: { pressed: false }, a: { pressed: false }, s: { pressed: false }, d: { pressed: false } };
+setInterval(() => {
+  if (!players[socket.id]) return;
+  if (keys.w.pressed) { players[socket.id].y -= 5; socket.emit('keydown', 'KeyW'); }
+  if (keys.a.pressed) { players[socket.id].x -= 5; socket.emit('keydown', 'KeyA'); }
+  if (keys.s.pressed) { players[socket.id].y += 5; socket.emit('keydown', 'KeyS'); }
+  if (keys.d.pressed) { players[socket.id].x += 5; socket.emit('keydown', 'KeyD'); }
+}, 15);
+window.addEventListener('keydown', (event) => {
+  if (!players[socket.id]) return;
+  const key = event.code.replace('Key', '').toLowerCase();
+  if (keys.hasOwnProperty(key)) keys[key].pressed = true;
+});
+window.addEventListener('keyup', (event) => {
+  if (!players[socket.id]) return;
+  const key = event.code.replace('Key', '').toLowerCase();
+  if (keys.hasOwnProperty(key)) keys[key].pressed = false;
+});
 
-const keys={
-  w:{
-    pressed:false
-  },
-  a:{
-    pressed:false
-  },
-  s:{
-    pressed:false
-  },
-  d:{
-    pressed:false
-  }
-}
+// --- INITIALIZATION ---
+document.querySelector('#usernameForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  socket.emit('initGame', document.querySelector('#usernameInput').value);
+  document.querySelector('#usernameForm').style.display = 'none';
+});
 
-setInterval(() => { 
-  if(keys.w.pressed){
-    players[socket.id].y -= 5
-    socket.emit('keydown','KeyW')
-  }
-  if(keys.a.pressed){
-    players[socket.id].x -= 5
-    socket.emit('keydown','KeyA')
-  }
-  if(keys.s.pressed){
-    players[socket.id].y += 5
-    socket.emit('keydown','KeyS')
-  }
-  if(keys.d.pressed){
-    players[socket.id].x += 5
-    socket.emit('keydown','KeyD')
-  }
-  
-  
-
-},15)
-
-window.addEventListener('keydown',(event)=>{
-  if(!players[socket.id]) return
-  
-  switch(event.code){
-    case 'KeyW':
-      keys.w.pressed = true
-      break
-    case 'KeyA':
-      keys.a.pressed = true
-      break
-    case 'KeyS':
-      keys.s.pressed = true
-      break
-    case 'KeyD':
-      keys.d.pressed = true
-      break
-  }
-})
-
-window.addEventListener('keyup',(event)=>{
-  if(!players[socket.id]) return
-  
-  switch(event.code){
-    case 'KeyW':
-      keys.w.pressed = false
-      break
-    case 'KeyA':
-      keys.a.pressed = false
-      break
-    case 'KeyS':
-      keys.s.pressed = false
-      break
-    case 'KeyD':
-      keys.d.pressed = false
-  }
-})
-
-document.querySelector('#usernameForm').addEventListener('submit',(event)=>{
-  event.preventDefault()
-  
-  socket.emit('initGame',document.querySelector('#usernameInput').value)
-  document.querySelector('#usernameForm').style.display = 'none'
-})
-
+animate(); // Start the animation loop
+ 
