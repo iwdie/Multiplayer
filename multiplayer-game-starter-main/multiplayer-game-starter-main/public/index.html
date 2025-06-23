@@ -1,12 +1,60 @@
 <html>
   <head>
+    <!-- ADDED: This tag is essential for proper scaling on mobile devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    
     <style>
       body {
         margin: 0;
+        /* Prevents scrolling and bouncing on mobile */
+        overflow: hidden;
       }
+      canvas {
+        /* Make canvas fill the screen */
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      
+      /* --- NEW CSS FOR THE JOYSTICK --- */
+      
+      /* Hide controls on non-touch devices (desktops) */
+      .mobile-controls {
+        display: none;
+      }
+
+      /* Use a media query to show controls only on touch-enabled devices */
+      @media (pointer: coarse) {
+        .mobile-controls {
+          display: block;
+        }
+      }
+      
+      #joystick-container {
+        position: absolute;
+        bottom: 30px;
+        left: 30px;
+        width: 120px;
+        height: 120px;
+        background: rgba(128, 128, 128, 0.3);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      #joystick-nub {
+        width: 60px;
+        height: 60px;
+        background: rgba(128, 128, 128, 0.6);
+        border-radius: 50%;
+        position: absolute;
+      }
+
     </style>
   </head>
   <body>
+    <!-- The canvas and other elements are unchanged -->
     <div
       style="
         position: absolute;
@@ -89,21 +137,28 @@
       <div id="myGroupInfo" style="margin-bottom: 20px;"></div>
       <div id="groupList"></div>
     </div>
+    
+    <!-- ADDED: The HTML for the joystick controls -->
+    <div class="mobile-controls">
+        <div id="joystick-container">
+            <div id="joystick-nub"></div>
+        </div>
+    </div>
+
 
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.2/gsap.min.js"
-      integrity="sha512-kVlGhj2qFy+KBCFuvjBJTGUMxbdqJKs4yK2jh0e0VPhWUPiPC87bzm4THmaaIee3Oj7j6sDpTTgm2EPPiESqBg=="
+      xintegrity="sha512-kVlGhj2qFy+KBCFuvjBJTGUMxbdqJKs4yK2jh0e0VPhWUPiPC87bzm4THmaaIee3Oj7j6sDpTTgm2EPPiESqBg=="
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     ></script>
-
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 
     <script src="./js/classes/Player.js"></script>
     <script src="./js/classes/horses.js"></script>
     <script src="./js/classes/Room.js"></script>
-
     <script src="./js/eventListeners.js"></script>
     <script src="./js/index.js"></script>
+    <script src="./js/mobileControls.js"></script>
   </body>
 </html>
