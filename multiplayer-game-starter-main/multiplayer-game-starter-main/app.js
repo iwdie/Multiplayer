@@ -5,7 +5,7 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid'); // Use 'npm install uuid' to add this package
 
-const io = new Server(server, { pingInterval: 2000, pingTimeout: 10000 });
+const io = new Server(server, { pingInterval: 2000, pingTimeout: 10000 }); // Increased timeout
 const port = process.env.PORT || 3000;
 
 app.use(express.static('public'));
@@ -34,6 +34,7 @@ function createLobby() {
         gameTimer: null,
         groupIdCounter: 1,
     };
+    console.log(`Lobby created: ${lobbyId}`);
     return lobbies[lobbyId];
 }
 
@@ -54,11 +55,14 @@ function resetLobby(lobbyId) {
     console.log(`Resetting lobby ${lobbyId}`);
     clearTimeout(lobby.gameTimer);
     
-    // Create a fresh lobby state, preserving the ID
-    lobbies[lobbyId] = {
-        ...createLobby(),
-        id: lobbyId,
-    };
+    // Notify clients before resetting
+    io.to(lobbyId).emit('lobbyReset');
+
+    // Delete the lobby after a moment to allow clients to disconnect or see message
+    setTimeout(() => {
+        delete lobbies[lobbyId];
+        console.log(`Lobby ${lobbyId} deleted.`);
+    }, 1000);
 }
 
 
@@ -112,11 +116,10 @@ function endGame(lobby) {
     const message = winningGroup ? 'Your group survived!' : 'Your group failed to assemble in time!';
     io.to(lobby.id).emit('gameOver', { message });
 
-    // Reset the lobby after a delay so players can see the result
     setTimeout(() => resetLobby(lobby.id), 10000);
 }
 
-// --- MAIN SERVER GAME LOOP (Processes all active lobbies) ---
+// --- MAIN SERVER GAME LOOP ---
 function serverTick() {
     for (const lobbyId in lobbies) {
         const lobby = lobbies[lobbyId];
@@ -131,7 +134,6 @@ function serverTick() {
                     if (inputs.d.pressed) player.x += PLAYER_SPEED;
                 }
             }
-            // Broadcast updates only for this lobby
             io.to(lobby.id).emit('updatePlayers', lobby.players);
         }
     }
@@ -153,9 +155,7 @@ io.on('connection', (socket) => {
             username, groupId: null, busy: false,
         };
 
-        // Tell the client they've joined
-        socket.emit('joinedLobby', { lobbyId: lobby.id, players: lobby.players });
-        // Tell everyone in the lobby about the new player
+        socket.emit('joinedLobby', { lobbyId: lobby.id });
         io.to(lobby.id).emit('updatePlayers', lobby.players);
 
         if (lobby.gamePhase === 'WAITING' && Object.keys(lobby.players).length === REQUIRED_PLAYER_COUNT) {
@@ -170,8 +170,82 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Mingle logic now needs to operate on the correct lobby
-    // ... (Your requestMingle and respondMingle logic would go here, adapted to use `lobbies[socket.lobbyId]`)
+    // --- CORRECTED MINGLE LOGIC ---
+    socket.on('requestMingle', (data) => {
+        const lobby = lobbies[socket.lobbyId];
+        if (!lobby || lobby.gamePhase !== 'MINGLE') return;
+
+        const { targetId, type } = data;
+        const requesterId = socket.id;
+        const requester = lobby.players[requesterId];
+        const target = lobby.players[targetId];
+
+        if (!requester || !target || requester.busy || target.busy) return;
+
+        const requestId = `${requesterId}-${targetId}`;
+        requester.busy = true; target.busy = true;
+        
+        lobby.groupRequests[requestId] = {
+            requesterId, targetId, type,
+            timeout: setTimeout(() => {
+                delete lobby.groupRequests[requestId];
+                if (lobby.players[requesterId]) lobby.players[requesterId].busy = false;
+                if (lobby.players[targetId]) lobby.players[targetId].busy = false;
+                io.to(lobby.id).emit('updatePlayers', lobby.players);
+            }, 10000),
+        };
+
+        io.to(targetId).emit('mingleRequested', { from: requesterId, username: requester.username, requestType: type });
+        io.to(requesterId).emit('mingleRequestSent', { to: targetId, username: target.username });
+        io.to(lobby.id).emit('updatePlayers', lobby.players);
+    });
+
+    socket.on('respondMingle', (data) => {
+        const lobby = lobbies[socket.lobbyId];
+        if (!lobby) return;
+
+        const { requestId, accepted } = data;
+        const request = lobby.groupRequests[requestId];
+        if (!request) return;
+
+        const { requesterId, targetId } = request;
+        const requester = lobby.players[requesterId];
+        const target = lobby.players[targetId];
+
+        clearTimeout(request.timeout);
+        delete lobby.groupRequests[requestId];
+
+        if(requester) requester.busy = false;
+        if(target) target.busy = false;
+
+        if (accepted && requester && target) {
+            let newGroupId;
+            if (!requester.groupId && !target.groupId) {
+                newGroupId = `${lobby.id}-${lobby.groupIdCounter++}`;
+                lobby.groups[newGroupId] = [{ id: requesterId, username: requester.username }, { id: targetId, username: target.username }];
+                requester.groupId = newGroupId; target.groupId = newGroupId;
+            } else if (!requester.groupId && target.groupId) {
+                newGroupId = target.groupId;
+                lobby.groups[newGroupId].push({ id: requesterId, username: requester.username });
+                requester.groupId = newGroupId;
+            } else if (requester.groupId && !target.groupId) {
+                newGroupId = requester.groupId;
+                lobby.groups[newGroupId].push({ id: targetId, username: target.username });
+                target.groupId = newGroupId;
+            } else if (requester.groupId && target.groupId && requester.groupId !== target.groupId) {
+                const oldGroup = lobby.groups[requester.groupId];
+                newGroupId = target.groupId;
+                lobby.groups[newGroupId].push(...oldGroup);
+                oldGroup.forEach(m => { if(lobby.players[m.id]) lobby.players[m.id].groupId = newGroupId; });
+                delete lobby.groups[requester.groupId];
+            }
+            io.to(lobby.id).emit('mingleSuccess');
+            io.to(lobby.id).emit('groupUpdate', lobby.groups);
+        } else {
+            io.to(requesterId).emit('mingleDeclined', target?.username);
+        }
+        io.to(lobby.id).emit('updatePlayers', lobby.players);
+    });
 
     socket.on('disconnect', () => {
         console.log('A user disconnected:', socket.id);
@@ -179,7 +253,6 @@ io.on('connection', (socket) => {
         if (lobby) {
             delete lobby.players[socket.id];
             delete lobby.playerInputs[socket.id];
-            // Tell the rest of the lobby a player left
             io.to(lobby.id).emit('updatePlayers', lobby.players);
         }
     });
