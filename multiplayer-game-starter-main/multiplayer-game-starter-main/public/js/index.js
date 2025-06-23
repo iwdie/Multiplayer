@@ -287,7 +287,8 @@ document.querySelector('#usernameForm').addEventListener('submit', (event) => {
       enterFullscreen();
       lockScreenToLandscape();
   }
-  socket.emit('initGame', document.querySelector('#usernameInput').value);
+  // CORRECTED: Emitting 'findGame' to match the new server lobby logic
+  socket.emit('findGame', document.querySelector('#usernameInput').value);
   document.querySelector('#usernameForm').style.display = 'none';
 });
 
