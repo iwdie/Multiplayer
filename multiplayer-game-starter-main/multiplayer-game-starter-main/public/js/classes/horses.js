@@ -1,55 +1,51 @@
 class horses {
-    constructor(x, y, width, height, imageSrc, glowColor) {
-      this.x = x;
-      this.y = y;
-      this.width = width;
-      this.height = height;
-      this.image = new Image();
-      this.image.src = imageSrc;
-      this.angle = 0; // Initial angle in radians
-      this.image.onload = () => {
-        this.loaded = true; // Ensure the image is loaded before drawing
-      };
-      this.loaded = false;
-  
-      this.glowColor = glowColor; // Color for the glow effect
-    }
-  
-    draw() {
-      if (this.loaded) {
-        c.save(); // Save the current canvas state
-        c.translate(this.x, this.y); // Move the canvas origin to the image's center
-        c.rotate(this.angle); // Rotate the canvas
-  
+  constructor(x, y, size, imageSrc, glowColor) {
+    this.x = x;
+    this.y = y;
+    this.size = size; // Using a single 'size' property
+    this.image = new Image();
+    this.image.src = imageSrc;
+    this.angle = 0; 
+    this.image.onload = () => {
+      this.loaded = true;
+    };
+    this.loaded = false;
 
-        c.beginPath();
-        c.arc(0, 0, this.width * 1.6, 0, Math.PI * 2); // Slightly larger than the image
-        c.fillStyle = "rgb(214, 89, 0)"; // Fill with orange color
-        c.fill();
-        c.closePath();
-  
+    this.glowColor = glowColor;
+  }
 
-        // Set glow effect
-        c.shadowBlur = 25; // Intensity of the glow
-        c.shadowColor = this.glowColor; // Color of the glow
-        c.shadowOffsetX = 2; // No horizontal shadow offset
-        c.shadowOffsetY = 2; // No vertical shadow offset
-  
-        // Draw the image with the glow effect
-        c.drawImage(
-          this.image,
-          -this.width / 2,
-          -this.height / 2,
-          this.width,
-          this.height
-        );
-  
-        c.restore(); // Restore the canvas state
-      }
-    }
-  
-    update() {
-      this.angle += 0.01; // Increment the angle to create rotation (adjust speed here)
+  draw() {
+    if (this.loaded) {
+      c.save();
+      c.translate(this.x, this.y);
+      c.rotate(this.angle);
+
+      // The glow effect also scales with the horse's size
+      c.beginPath();
+      c.arc(0, 0, this.size * 0.8, 0, Math.PI * 2); 
+      c.fillStyle = "rgb(214, 89, 0)";
+      c.fill();
+      c.closePath();
+
+      c.shadowBlur = 25;
+      c.shadowColor = this.glowColor;
+      c.shadowOffsetX = 2;
+      c.shadowOffsetY = 2;
+
+      // Draw the image using the dynamic size
+      c.drawImage(
+        this.image,
+        -this.size / 2,
+        -this.size / 2,
+        this.size,
+        this.size
+      );
+
+      c.restore();
     }
   }
-  
+
+  update() {
+    this.angle += 0.01;
+  }
+}
