@@ -2,16 +2,20 @@ class horses {
   constructor(x, y, size, imageSrc, glowColor) {
     this.x = x;
     this.y = y;
-    this.size = size; // Using a single 'size' property
+    this.size = size;
     this.image = new Image();
-    this.image.src = imageSrc;
-    this.angle = 0; 
+    this.angle = 0;
+    this.loaded = false;
+    this.glowColor = glowColor;
+
+    // --- CORRECTED ORDER ---
+    // 1. Set up the onload function first.
     this.image.onload = () => {
       this.loaded = true;
     };
-    this.loaded = false;
-
-    this.glowColor = glowColor;
+    
+    // 2. Then, set the src to start the download.
+    this.image.src = imageSrc;
   }
 
   draw() {
@@ -22,7 +26,7 @@ class horses {
 
       // The glow effect also scales with the horse's size
       c.beginPath();
-      c.arc(0, 0, this.size * 0.8, 0, Math.PI * 2); 
+      c.arc(0, 0, this.size * 0.8, 0, Math.PI * 2);
       c.fillStyle = "rgb(214, 89, 0)";
       c.fill();
       c.closePath();

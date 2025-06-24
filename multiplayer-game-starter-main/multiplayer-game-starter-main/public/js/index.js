@@ -14,9 +14,11 @@ const players = {};
 // --- GAME OBJECTS ---
 const x = canvas.width / 2;
 const y = canvas.height / 2;
-const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)');
-const safeRoom = new Room(200, 150, 400, 300, 'rgba(0, 255, 0, 0.15)');
+const horse = new horses(x, y, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)');
+const safeRoom = new Room(200, 150, 400, 300, 'rgba(255, 0, 238, 0.13)');
 const backgroundMusic = new Audio('./sounds/mingle_sound.mp3');
+
+
 backgroundMusic.loop = true;
 backgroundMusic.volume = 0.5;
 
@@ -258,11 +260,12 @@ function drawTimer() {
 let animationId;
 function animate() {
   animationId = requestAnimationFrame(animate);
-  c.fillStyle = 'rgba(243, 206, 167, 0.76)';
+  c.fillStyle = 'rgba(237, 137, 30, 0.76)';
   c.fillRect(0, 0, canvas.width, canvas.height);
   
   safeRoom.draw();
   horse.update();
+  
   horse.draw();
 
   if (gamePhase === 'MINGLE') {
