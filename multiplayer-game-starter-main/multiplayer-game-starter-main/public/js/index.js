@@ -2,34 +2,8 @@ const canvas = document.querySelector('canvas')
 const c = canvas.getContext('2d')
 const socket = io()
 
-// --- RESPONSIVE SIZING ---
-let gameSettings = {}; // Will hold all dynamic sizes
-
-function calculateSizes() {
-    const baseUnit = Math.min(window.innerWidth, window.innerHeight) / 100;
-
-    gameSettings = {
-        playerSize: baseUnit * 6,       // Player is 6% of the smaller screen dimension
-        horseSize: baseUnit * 25,       // Horse is 25%
-        roomWidth: baseUnit * 50,       // Room is 50%
-        roomHeight: baseUnit * 40,      // Room is 40%
-        get roomX() { return (canvas.width - this.roomWidth) / 2; },
-        get roomY() { return (canvas.height - this.roomHeight) / 2; }
-    };
-
-    // Update game objects with new sizes
-    safeRoom.width = gameSettings.roomWidth;
-    safeRoom.height = gameSettings.roomHeight;
-    safeRoom.x = gameSettings.roomX;
-    safeRoom.y = gameSettings.roomY;
-    
-    horse.size = gameSettings.horseSize;
-    
-    for(const id in players){
-        players[id].size = gameSettings.playerSize;
-    }
-}
-
+canvas.width = innerWidth
+canvas.height = innerHeight
 
 // --- CLIENT-SIDE STATE ---
 let gamePhase = 'WAITING';
@@ -38,10 +12,10 @@ let clientTimerInterval = null;
 const players = {}; 
 
 // --- GAME OBJECTS ---
-// Initialized with temporary sizes, will be updated by calculateSizes()
-let horse = new horses(canvas.width / 2, canvas.height / 2, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)');
-let safeRoom = new Room(0, 0, 0, 0, 'rgba(0, 255, 0, 0.15)');
-
+const x = canvas.width / 2;
+const y = canvas.height / 2;
+const horse = new horses(x, y, 180, 180, './images/horseswithbg-removebg-preview.png', 'rgba(248, 232, 84, 0.89)');
+const safeRoom = new Room(200, 150, 400, 300, 'rgba(0, 255, 0, 0.15)');
 const backgroundMusic = new Audio('./sounds/mingle_sound.mp3');
 backgroundMusic.loop = true;
 backgroundMusic.volume = 0.5;
@@ -58,6 +32,8 @@ startMusicButton.style.padding = '10px';
 startMusicButton.style.fontSize = '16px';
 startMusicButton.style.cursor = 'pointer';
 document.body.appendChild(startMusicButton);
+const mingleBtn = document.getElementById('mingle-btn');
+
 
 // --- SOCKET EVENT LISTENERS ---
 socket.on('gamePhaseUpdate', (data) => {
@@ -90,7 +66,7 @@ socket.on('updatePlayers', (BackendPlayers) => {
   for (const id in BackendPlayers) {
     const backendPlayer = BackendPlayers[id];
     if (!players[id]) {
-      players[id] = new Player(backendPlayer.x, backendPlayer.y, gameSettings.playerSize, './images/image (2).png');
+      players[id] = new Player(backendPlayer.x, backendPlayer.y, 50, 50, './images/image (2).png');
     }
     const player = players[id];
     player.serverX = backendPlayer.x;
@@ -112,9 +88,73 @@ startMusicButton.addEventListener('click', () => {
   startMusicButton.style.display = 'none';
 });
 
-// --- MINGLE LOGIC ---
+// --- NEW, ROBUST MINGLE LOGIC ---
 let isDialogOpen = false;
 let currentMingleTargetId = null;
+let potentialMingleTarget = null;
+
+function updateMingleState() {
+    const localPlayer = players[socket.id];
+    if (!localPlayer || isDialogOpen || currentMingleTargetId) {
+        mingleBtn.disabled = true;
+        mingleBtn.classList.remove('enabled');
+        return;
+    }
+
+    let closestDistance = Infinity;
+    let bestTarget = null;
+
+    for (const id in players) {
+        if (id === socket.id) continue;
+        const otherPlayer = players[id];
+        
+        const isEligible = !otherPlayer.busy && !otherPlayer.isRequestReceived && !(localPlayer.groupId && localPlayer.groupId === otherPlayer.groupId);
+        
+        if (isEligible && localPlayer.isMinglingWith(otherPlayer)) {
+            const dx = localPlayer.x - otherPlayer.x;
+            const dy = localPlayer.y - otherPlayer.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                bestTarget = id;
+            }
+        }
+    }
+    
+    potentialMingleTarget = bestTarget;
+
+    if (potentialMingleTarget) {
+        mingleBtn.disabled = false;
+        mingleBtn.classList.add('enabled');
+    } else {
+        mingleBtn.disabled = true;
+        mingleBtn.classList.remove('enabled');
+    }
+}
+
+
+if (mingleBtn) {
+    mingleBtn.addEventListener('click', () => {
+        if (potentialMingleTarget) {
+            const localPlayer = players[socket.id];
+            const otherPlayer = players[potentialMingleTarget];
+            if (!localPlayer || !otherPlayer) return;
+
+            let requestType = '';
+            if (!localPlayer.groupId && !otherPlayer.groupId) requestType = 'newGroup';
+            else if (localPlayer.groupId && !otherPlayer.groupId) requestType = 'inviteToGroup';
+            else if (!localPlayer.groupId && otherPlayer.groupId) requestType = 'joinGroup';
+            else requestType = 'mergeGroups';
+
+            socket.emit('requestMingle', { targetId: potentialMingleTarget, type: requestType });
+            currentMingleTargetId = potentialMingleTarget;
+            mingleBtn.disabled = true;
+            mingleBtn.classList.remove('enabled');
+        }
+    });
+}
+
 
 socket.on('groupUpdate', (groups) => {
     const groupList = document.querySelector('#groupList');
@@ -167,28 +207,6 @@ socket.on('mingleSuccess', () => { currentMingleTargetId = null; showTemporaryMe
 socket.on('mingleDeclined', (username) => { showTemporaryMessage(`${username} declined your request.`); currentMingleTargetId = null; });
 socket.on('mingleTimeout', (username) => { showTemporaryMessage(`Mingle request to ${username} timed out.`); currentMingleTargetId = null; });
 socket.on('mingleError', (message) => { showTemporaryMessage(`Mingle Error: ${message}`); currentMingleTargetId = null; });
-
-function checkMingle() {
-  const localPlayer = players[socket.id];
-  if (!localPlayer || isDialogOpen || currentMingleTargetId) return;
-  for (const id in players) {
-    if (id === socket.id) continue;
-    const otherPlayer = players[id];
-    if (otherPlayer.busy || otherPlayer.isRequestReceived) continue;
-    if (localPlayer.isMinglingWith(otherPlayer) && !(localPlayer.groupId && localPlayer.groupId === otherPlayer.groupId)) {
-        let requestType = '';
-        if (!localPlayer.groupId && !otherPlayer.groupId) requestType = 'newGroup';
-        else if (localPlayer.groupId && !otherPlayer.groupId) requestType = 'inviteToGroup';
-        else if (!localPlayer.groupId && otherPlayer.groupId) requestType = 'joinGroup';
-        else requestType = 'mergeGroups';
-        if (requestType) {
-            socket.emit('requestMingle', { targetId: id, type: requestType });
-            currentMingleTargetId = id;
-            return;
-        }
-    }
-  }
-}
 
 function openMingleDialog(fromPlayerId, fromUsername, dialogMessage) {
     isDialogOpen = true;
@@ -248,7 +266,7 @@ function animate() {
   horse.draw();
 
   if (gamePhase === 'MINGLE') {
-    checkMingle();
+    updateMingleState();
   }
 
   for (const id in players) {
@@ -272,8 +290,20 @@ setInterval(() => {
 }, 15);
 window.addEventListener('keydown', (event) => {
   if (!players[socket.id]) return;
+  
+  // Handle movement keys
   const key = event.code.replace('Key', '').toLowerCase();
-  if (keys.hasOwnProperty(key)) keys[key].pressed = true;
+  if (keys.hasOwnProperty(key)) {
+    keys[key].pressed = true;
+  }
+  
+  // --- NEW: Handle Spacebar for Mingle ---
+  if (event.code === 'Space') {
+    event.preventDefault(); // Prevent page from scrolling
+    if (mingleBtn && !mingleBtn.disabled) {
+      mingleBtn.click();
+    }
+  }
 });
 window.addEventListener('keyup', (event) => {
   if (!players[socket.id]) return;
@@ -281,27 +311,31 @@ window.addEventListener('keyup', (event) => {
   if (keys.hasOwnProperty(key)) keys[key].pressed = false;
 });
 
-// --- RESIZE AND INITIALIZATION ---
-function handleResize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    calculateSizes();
-    horse.x = canvas.width / 2;
-    horse.y = canvas.height / 2;
+// --- Mobile Orientation and Fullscreen Logic ---
+function lockScreenToLandscape() {
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch((error) => console.error('Could not lock screen:', error));
+    }
+}
+function enterFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(err => console.error(`Fullscreen failed: ${err.message}`));
+    } else if (elem.webkitRequestFullscreen) { // Safari
+        elem.webkitRequestFullscreen();
+    }
 }
 
-window.addEventListener('resize', handleResize);
-
+// --- INITIALIZATION ---
 document.querySelector('#usernameForm').addEventListener('submit', (event) => {
   event.preventDefault();
   const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   if (isMobile) {
-    // Fullscreen and landscape logic
+      enterFullscreen();
+      lockScreenToLandscape();
   }
   socket.emit('findGame', document.querySelector('#usernameInput').value);
   document.querySelector('#usernameForm').style.display = 'none';
 });
 
-// Initial setup
-handleResize();
 animate();

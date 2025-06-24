@@ -1,32 +1,28 @@
 <html>
   <head>
-    <!-- ADDED: This tag is essential for proper scaling on mobile devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     
     <style>
       body {
         margin: 0;
-        /* Prevents scrolling and bouncing on mobile */
         overflow: hidden;
       }
       canvas {
-        /* Make canvas fill the screen */
         display: block;
         width: 100vw;
         height: 100vh;
       }
       
-      /* --- NEW CSS FOR THE JOYSTICK --- */
+      /* --- ADJUSTED CSS FOR CONTROLS --- */
       
-      /* Hide controls on non-touch devices (desktops) */
-      .mobile-controls {
+      /* The joystick will still only appear on touch devices */
+      #joystick-container {
         display: none;
       }
 
-      /* Use a media query to show controls only on touch-enabled devices */
       @media (pointer: coarse) {
-        .mobile-controls {
-          display: block;
+        #joystick-container {
+          display: flex;
         }
       }
       
@@ -38,7 +34,6 @@
         height: 120px;
         background: rgba(128, 128, 128, 0.3);
         border-radius: 50%;
-        display: flex;
         justify-content: center;
         align-items: center;
       }
@@ -49,6 +44,36 @@
         background: rgba(128, 128, 128, 0.6);
         border-radius: 50%;
         position: absolute;
+      }
+
+      /* Mingle button is now always visible */
+      #mingle-btn {
+        position: absolute;
+        bottom: 30px;
+        right: 30px;
+        width: 100px;
+        height: 100px;
+        background-color: rgba(212, 6, 95, 0.4);
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.5);
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background-color 0.2s, box-shadow 0.2s;
+      }
+
+      #mingle-btn:disabled {
+        background-color: rgba(128, 128, 128, 0.3);
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      #mingle-btn.enabled {
+        background-color: rgba(212, 6, 95, 0.8);
+        box-shadow: 0 0 20px rgb(246, 59, 174);
+        cursor: pointer;
       }
 
     </style>
@@ -138,11 +163,11 @@
       <div id="groupList"></div>
     </div>
     
-    <!-- ADDED: The HTML for the joystick controls -->
     <div class="mobile-controls">
         <div id="joystick-container">
             <div id="joystick-nub"></div>
         </div>
+        <button id="mingle-btn" disabled>Mingle</button>
     </div>
 
 
@@ -159,6 +184,7 @@
     <script src="./js/classes/Room.js"></script>
     <script src="./js/eventListeners.js"></script>
     <script src="./js/index.js"></script>
+    
     <script src="./js/mobileControls.js"></script>
   </body>
 </html>
