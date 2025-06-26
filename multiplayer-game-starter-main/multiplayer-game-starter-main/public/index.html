@@ -13,9 +13,7 @@
         height: 100vh;
       }
       
-      /* --- ADJUSTED CSS FOR CONTROLS --- */
-      
-      /* The joystick will still only appear on touch devices */
+      /* The joystick will only appear on touch devices */
       #joystick-container {
         display: none;
       }
@@ -36,6 +34,7 @@
         border-radius: 50%;
         justify-content: center;
         align-items: center;
+        z-index: 150;
       }
       
       #joystick-nub {
@@ -46,7 +45,25 @@
         position: absolute;
       }
 
-      /* Mingle button is now always visible */
+      /* CORRECTED: Removed 'display: none' to make the button visible */
+      #voice-chat-container {
+        position: absolute;
+        top: 80px;
+        right: 10px;
+        z-index: 200;
+      }
+
+      #join-voice-btn {
+        background-color: #5865F2; /* Discord purple */
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        font-family: sans-serif;
+      }
+
       #mingle-btn {
         position: absolute;
         bottom: 30px;
@@ -63,11 +80,13 @@
         justify-content: center;
         align-items: center;
         transition: background-color 0.2s, box-shadow 0.2s;
+        z-index: 150;
       }
 
       #mingle-btn:disabled {
         background-color: rgba(128, 128, 128, 0.3);
         color: rgba(255, 255, 255, 0.4);
+        cursor: not-allowed;
       }
 
       #mingle-btn.enabled {
@@ -79,7 +98,6 @@
     </style>
   </head>
   <body>
-    <!-- The canvas and other elements are unchanged -->
     <div
       style="
         position: absolute;
@@ -163,12 +181,18 @@
       <div id="groupList"></div>
     </div>
     
+    <!-- Joystick is the only thing that should be mobile-specific -->
     <div class="mobile-controls">
         <div id="joystick-container">
             <div id="joystick-nub"></div>
         </div>
-        <button id="mingle-btn" disabled>Mingle</button>
     </div>
+
+    <!-- Mingle and Voice buttons are moved outside to be visible on all devices -->
+    <div id="voice-chat-container">
+      <button id="join-voice-btn">Join Voice Chat</button>
+    </div>
+    <button id="mingle-btn" disabled>Mingle</button>
 
 
     <script

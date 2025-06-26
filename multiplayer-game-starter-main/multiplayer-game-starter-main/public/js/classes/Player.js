@@ -1,9 +1,8 @@
 class Player {
-  constructor(x, y, width, height, imageSrc, groupId = null) {
+  constructor(x, y, size, imageSrc) {
     this.x = x;
     this.y = y;
-    this.width = width;
-    this.height = height;
+    this.size = size;
     this.image = new Image();
     
     // --- FIX: Add a 'loaded' flag ---
@@ -14,12 +13,12 @@ class Player {
     };
     
     this.image.src = imageSrc;
-    this.groupId = groupId;
-    
+
     // Properties for server-side state and smoothing
     this.serverX = x;
     this.serverY = y;
     this.username = '';
+    this.groupId = null;
     this.busy = false;
     this.isRequestReceived = false;
   }
@@ -27,14 +26,16 @@ class Player {
   draw() {
     // --- FIX: Only draw if the image is loaded ---
     if (this.loaded) {
-      c.drawImage(this.image, this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+      // Draw the player image
+      c.drawImage(this.image, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
       
       // Draw the username as well
       if (this.username) {
-        c.font = '12px sans-serif';
+        const fontSize = this.size / 4;
+        c.font = `${fontSize}px sans-serif`;
         c.fillStyle = 'black';
         c.textAlign = 'center';
-        c.fillText(this.username, this.x, this.y - this.height / 2 - 5);
+        c.fillText(this.username, this.x, this.y - this.size / 2 - 5);
       }
     }
   }
@@ -43,6 +44,7 @@ class Player {
     const dx = this.x - otherPlayer.x;
     const dy = this.y - otherPlayer.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    return distance < this.width + 20; // A simple proximity check
+    // The mingle range scales with the player size
+    return distance < this.size * 1.5; 
   }
 }
